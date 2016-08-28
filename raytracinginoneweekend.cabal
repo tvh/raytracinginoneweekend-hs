@@ -11,7 +11,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      lib
-  ghc-options:         -O2
+  ghc-options:         -O2 -Wall
   build-depends:       linear
                      , lens
                      , base
@@ -25,11 +25,12 @@ library
 executable raytracer
   hs-source-dirs:      src
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
   build-depends:       base
                      , linear
                      , lens
-                     , raytracingbook
+                     , raytracinginoneweekend
                      , vector
                      , mwc-random
+                     , JuicyPixels
   default-language:    Haskell2010
