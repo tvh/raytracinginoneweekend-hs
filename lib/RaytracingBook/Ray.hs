@@ -5,13 +5,13 @@ import Linear.V3
 import Linear.Vector
 import Control.Lens
 
-data Ray a =
+data Ray =
     Ray
-    { _origin :: !(V3 a)
-    , _direction :: !(V3 a)
+    { _origin :: !(V3 Float)
+    , _direction :: !(V3 Float)
     }
 makeLenses ''Ray
 
 {-# INLINE pointAtParameter #-}
-pointAtParameter :: Num a => Ray a -> a -> V3 a
+pointAtParameter :: Ray -> Float -> V3 Float
 pointAtParameter ray t = ray^.origin + t *^ ray^.direction

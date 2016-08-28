@@ -1,3 +1,6 @@
 *~
 *.ppm
+*.png
+*.jpg
 .stack-work
+#*#

@@ -15,14 +15,18 @@ library
   build-depends:       linear
                      , lens
                      , base
+                     , mwc-random
                      , vector
+                     , transformers
+                     , primitive
   exposed-modules:     RaytracingBook.Ray
                      , RaytracingBook.Hitable
                      , RaytracingBook.Sphere
                      , RaytracingBook.Camera
+                     , RaytracingBook.Monad
   default-language:    Haskell2010
 
-executable raytracer
+executable rayer
   hs-source-dirs:      src
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
@@ -31,6 +35,5 @@ executable raytracer
                      , lens
                      , raytracinginoneweekend
                      , vector
-                     , mwc-random
                      , JuicyPixels
   default-language:    Haskell2010

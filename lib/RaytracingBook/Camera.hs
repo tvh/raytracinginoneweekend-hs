@@ -6,16 +6,16 @@ import RaytracingBook.Ray
 import Linear
 import Control.Lens
 
-data Camera f =
+data Camera =
     Camera
-    { _lowerLeftCorner :: !(V3 f)
-    , _horizontal :: !(V3 f)
-    , _vertical :: !(V3 f)
-    , _cameraOrigin :: !(V3 f)
+    { _lowerLeftCorner :: !(V3 Float)
+    , _horizontal :: !(V3 Float)
+    , _vertical :: !(V3 Float)
+    , _cameraOrigin :: !(V3 Float)
     }
 makeLenses ''Camera
 
-defaultCamera :: Fractional f => Camera f
+defaultCamera :: Camera
 defaultCamera =
     Camera
     { _lowerLeftCorner = V3 (-2) (-1) (-1)
@@ -24,7 +24,7 @@ defaultCamera =
     , _cameraOrigin = V3 0 0 0
     }
 
-getRay :: Floating f => Camera f -> f -> f -> Ray f
+getRay :: Camera -> Float -> Float -> Ray
 getRay cam u v =
     Ray
     { _origin = cam^.cameraOrigin
