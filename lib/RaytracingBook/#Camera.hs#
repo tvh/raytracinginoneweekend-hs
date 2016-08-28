@@ -1,0 +1,25 @@
+{-# LANGUAGE TemplateHaskell #-}
+module RaytracingBook.Camera where
+{-# LANGUAGE DuplicateRecordFields #-}
+import RaytracingBook.Ray
+
+import Linear
+import Control.Lens
+
+data Camera f =
+    Camera
+    { _lowerLeftCorner :: !(V3 f)
+    , _horizontal :: !(V3 f)
+    , _vertical :: !(V3 f)
+    , _origin :: !(V3 f)
+    }
+makeLenses ''Camera
+
+defaultCamera :: Camera f
+defaultCamera =
+    Camera
+    { _lowerLeftCorner = V3 (-2.0) (-1.0) (-1.0)
+    , _horizontal = V3 4 0 0
+    , _vertical = V3 0 2 0
+    , _origin = V3 0 0 0
+    }
