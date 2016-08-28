@@ -37,4 +37,5 @@ executable rayer
                      , raytracinginoneweekend
                      , vector
                      , JuicyPixels
+                     , async
   default-language:    Haskell2010

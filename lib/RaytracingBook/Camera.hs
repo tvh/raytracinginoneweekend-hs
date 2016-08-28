@@ -1,39 +1,65 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 module RaytracingBook.Camera where
+
+import RaytracingBook.Monad
 import RaytracingBook.Ray
 
 import Linear
 import Control.Lens
 
-data Camera =
-    Camera
-    { _lowerLeftCorner :: !(V3 Float)
-    , _horizontal :: !(V3 Float)
-    , _vertical :: !(V3 Float)
-    , _cameraOrigin :: !(V3 Float)
-    }
-makeLenses ''Camera
+newtype Camera =
+    Camera { getRay :: Float -> Float -> Rayer Ray }
 
-camera :: Float -> Float -> Camera
-camera hfov aspect =
-    let theta = hfov*pi/180
+data CameraOpts =
+    CameraOpts
+    { _lookfrom :: !(V3 Float)
+    , _lookat :: !(V3 Float)
+    , _vup :: !(V3 Float)
+    , _hfov :: !Float
+    , _aspect :: !Float
+    , _aperture :: !Float
+    , _focusDist :: !Float
+    }
+makeLenses ''CameraOpts
+
+defaultCameraOpts :: CameraOpts
+defaultCameraOpts =
+    CameraOpts
+    { _lookfrom = V3 0 0 0
+    , _lookat = V3 0 0 (-1)
+    , _vup = V3 0 1 0
+    , _hfov = 120
+    , _aspect = 4/3
+    , _aperture = 0.2
+    , _focusDist = 1
+    }
+
+getCamera :: CameraOpts -> Camera
+getCamera opts =
+    let lens_radius = opts^.aperture / 2
+        theta = opts^.hfov*pi/180
         half_width = tan (theta/2)
-        half_height = half_width/aspect
+        half_height = half_width/opts^.aspect
+        w = normalize (opts^.lookfrom - opts^.lookat)
+        u = normalize (cross (opts^.vup) w)
+        v = cross w u
+        lower_left_corner = opts^.lookfrom - half_width*opts^.focusDist*^u - half_height*opts^.focusDist*^v - opts^.focusDist*^w
+        horizontal = 2*half_width*opts^.focusDist *^ u
+        vertical = 2*half_height*opts^.focusDist *^ v
+        camera_origin = opts^.lookfrom
+        getRayFun s t = do
+            rd <- (lens_radius *^) <$> randomInUnitDisk
+            let offset = u ^* rd^._x + v ^* rd^._y
+            pure Ray
+                 { _origin = camera_origin + offset
+                 , _direction =
+                      lower_left_corner
+                      + (s *^ horizontal)
+                      + (t *^ vertical)
+                      - camera_origin
+                      - offset
+                 }
     in Camera
-       { _lowerLeftCorner = V3 (-half_width) (-half_height) (-1)
-       , _horizontal = V3 (2*half_width) 0 0
-       , _vertical = V3 0 (2*half_height) 0
-       , _cameraOrigin = V3 0 0 0
+       { getRay = getRayFun
        }
-
-getRay :: Camera -> Float -> Float -> Ray
-getRay cam u v =
-    Ray
-    { _origin = cam^.cameraOrigin
-    , _direction =
-         cam^.lowerLeftCorner
-         + (u *^ cam^.horizontal)
-         + (v *^ cam^.vertical)
-         - cam^.cameraOrigin
-    }

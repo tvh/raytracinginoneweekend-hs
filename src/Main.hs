@@ -1,5 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
@@ -10,10 +10,12 @@ import RaytracingBook.Ray
 import RaytracingBook.Sphere
 
 import Codec.Picture
+import Control.Concurrent.Async
 import Control.Lens
 import Linear
 import System.Environment
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable as VS
 
 color :: Ray -> HitableList -> Word -> Rayer (V3 Float)
 color ray world depth =
@@ -31,51 +33,80 @@ color ray world depth =
               t = 0.5 * unit_direction^._y+1
           in (1-t)*^V3 1 1 1 + t*^V3 0.5 0.7 1.0
 
+randomCoordinate :: Float -> Rayer (V3 Float)
+randomCoordinate radius =
+    V3 <$> uniformR (-20,20) <*> pure radius <*> uniformR (-20,20)
+
+randomColor :: Rayer (V3 Float)
+randomColor = V3 <$> uniform <*> uniform <*> uniform
+
+randomMaterial :: Rayer Material
+randomMaterial = do
+    rnd <- uniform
+    if | rnd < 0.4 -> do
+           col <- randomColor
+           pure $ lambertian col
+       | rnd < 0.8 -> do
+           col <- randomColor
+           fuzz <- uniform
+           pure $ metal col fuzz
+       | otherwise -> do
+           nt <- uniformR (1.3,2)
+           pure $ dielectric nt
+
+randomSphere :: Rayer Sphere
+randomSphere = do
+    rad <- uniformR (0.2,0.6)
+    coord <- randomCoordinate rad
+    mat <- randomMaterial
+    pure Sphere
+         { _sphere_center = coord
+         , _sphere_radius = rad
+         , _sphere_material = mat
+         }
+
+randomWorld :: Int -> Rayer HitableList
+randomWorld n = do
+    let ground =
+            Sphere
+            { _sphere_center = V3 0 (-500) (-1)
+            , _sphere_radius = 500
+            , _sphere_material = lambertian (V3 0.8 0.8 0.0)
+            }
+    marbles <- V.replicateM n randomSphere
+    pure $ HitableList $ V.map (HitableItem . hit) $ ground `V.cons` marbles
+
 main :: IO ()
 main = do
     [out] <- getArgs
-    let nx = 800 :: Int
-        ny = 600 :: Int
-        ns = 10 :: Int
-        spheres =
-            [ Sphere
-              { _sphere_center = V3 0 0 (-1)
-              , _sphere_radius = 0.5
-              , _sphere_material = lambertian (V3 0.1 0.2 0.5)
-              }
-            , Sphere
-              { _sphere_center = V3 0 (-100.5) (-1)
-              , _sphere_radius = 100
-              , _sphere_material = lambertian (V3 0.8 0.8 0.0)
-              }
-            , Sphere
-              { _sphere_center = V3 1 0 (-1)
-              , _sphere_radius = 0.5
-              , _sphere_material = metal (V3 0.8 0.6 0.2) 1
-              }
-            , Sphere
-              { _sphere_center = V3 (-1) 0 (-1)
-              , _sphere_radius = 0.5
-              , _sphere_material = dielectric 1.5
-              }
-            , Sphere
-              { _sphere_center = V3 (-1) 0 (-1)
-              , _sphere_radius = -0.45
-              , _sphere_material = dielectric 1.5
-              }
-            ]
-        world = HitableList $ V.map (HitableItem . hit) spheres
-        cam = camera 120 (fromIntegral nx/fromIntegral ny)
-    image <-
-        withImage nx ny $ \i j ->
+    let nx = 1920 :: Int
+        ny = 1080 :: Int
+        ns = 16 :: Int
+        nt = 8 :: Int
+        camOpts =
+            defaultCameraOpts
+            & lookfrom .~ V3 3 3 2
+            & lookat .~ V3 0 0 (-1)
+            & focusDist .~ sqrt (quadrance (V3 3 3 2 - V3 0 0 (-1)))
+            & aperture .~ 0.1
+            & aspect .~ fromIntegral nx / fromIntegral ny
+            & hfov .~ 120
+        cam = getCamera camOpts
+    world <- runRayer (randomWorld 300)
+    imgDatas <-
+        forConcurrently (V.fromList [1..nt]) $ \_ ->
+        VS.generateM (nx*ny) $ \n ->
         runRayer $ do
-        cols <- V.forM [1..ns] $ \_ ->
-            do uD <- drand48
-               vD <- drand48
-               let u = (fromIntegral i + uD) / fromIntegral nx
-                   v = (fromIntegral (ny - j) + vD) / fromIntegral ny
-                   r = getRay cam u v
-               color r world 0
-        let V3 ir ig ib = V.sum cols / fromIntegral ns
-        pure $ PixelRGBF ir ig ib
-    savePngImage out (ImageRGBF image)
+        let (j,i) = n `quotRem` nx
+        cols <- VS.replicateM ns $ do
+            uD <- drand48
+            vD <- drand48
+            let u = (fromIntegral i + uD) / fromIntegral nx
+                v = (fromIntegral (ny - j) + vD) / fromIntegral ny
+            r <- getRay cam u v
+            color r world 0
+        pure $ VS.sum cols / fromIntegral ns
+    let gamma = 1.8
+        imgData = VS.map ((** (1/gamma)) . (/ fromIntegral nt)) $ V.foldl1' (VS.zipWith (+)) imgDatas
+        image = generateImage (\i j -> let V3 r g b = VS.unsafeIndex imgData (j*nx+i) in PixelRGBF r g b) nx ny
+    savePngImage out $ ImageRGBF image
