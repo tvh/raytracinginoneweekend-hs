@@ -35,8 +35,8 @@ main :: IO ()
 main = do
     [out] <- getArgs
     let nx = 800 :: Int
-        ny = 400 :: Int
-        ns = 100 :: Int
+        ny = 600 :: Int
+        ns = 10 :: Int
         spheres =
             [ Sphere
               { _sphere_center = V3 0 0 (-1)
@@ -65,7 +65,7 @@ main = do
               }
             ]
         world = HitableList $ V.map (HitableItem . hit) spheres
-        camera = defaultCamera
+        cam = camera 120 (fromIntegral nx/fromIntegral ny)
     image <-
         withImage nx ny $ \i j ->
         runRayer $ do
@@ -74,7 +74,7 @@ main = do
                vD <- drand48
                let u = (fromIntegral i + uD) / fromIntegral nx
                    v = (fromIntegral (ny - j) + vD) / fromIntegral ny
-                   r = getRay camera u v
+                   r = getRay cam u v
                color r world 0
         let V3 ir ig ib = V.sum cols / fromIntegral ns
         pure $ PixelRGBF ir ig ib

@@ -15,14 +15,17 @@ data Camera =
     }
 makeLenses ''Camera
 
-defaultCamera :: Camera
-defaultCamera =
-    Camera
-    { _lowerLeftCorner = V3 (-2) (-1) (-1)
-    , _horizontal = V3 4 0 0
-    , _vertical = V3 0 2 0
-    , _cameraOrigin = V3 0 0 0
-    }
+camera :: Float -> Float -> Camera
+camera hfov aspect =
+    let theta = hfov*pi/180
+        half_width = tan (theta/2)
+        half_height = half_width/aspect
+    in Camera
+       { _lowerLeftCorner = V3 (-half_width) (-half_height) (-1)
+       , _horizontal = V3 (2*half_width) 0 0
+       , _vertical = V3 0 (2*half_height) 0
+       , _cameraOrigin = V3 0 0 0
+       }
 
 getRay :: Camera -> Float -> Float -> Ray
 getRay cam u v =
