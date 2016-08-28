@@ -69,15 +69,54 @@ lambertian albedo = Material scatterFun
 reflect :: V3 Float -> V3 Float -> V3 Float
 reflect v n = v - 2*dot v n*^n
 
-metal :: V3 Float -> Material
-metal albedo = Material scatterFun
+metal :: V3 Float -> Float -> Material
+metal albedo fuzz' = Material scatterFun
   where
+    fuzz :: Float
+    fuzz = if fuzz' < 1 then fuzz' else 1
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun r_in rec =
-        do let reflected = reflect (normalize (r_in^.direction)) (rec^.normal)
-               scattered = Ray (rec^.p) reflected
+        do rnd <- randomInUnitSphere
+           let reflected = reflect (normalize (r_in^.direction)) (rec^.normal)
+               scattered = Ray (rec^.p) (reflected + fuzz*^rnd)
                attenuation = albedo
                res = if dot (scattered^.direction) (rec^.normal) > 0
                      then Just (attenuation, scattered)
                      else Nothing
            pure res
+
+refract :: V3 Float -> V3 Float -> Float -> Maybe (V3 Float)
+refract v n ni_over_nt =
+    let uv = normalize v
+        dt = dot uv n
+        discriminant = 1 - ni_over_nt*ni_over_nt*(1-dt*dt)
+    in if (discriminant > 0)
+       then Just (ni_over_nt*^(uv - n^*dt) - n^*sqrt discriminant)
+       else Nothing
+
+schlick :: Float -> Float -> Float
+schlick cosine ref_idx =
+    let r0' = (1-ref_idx) / (1+ref_idx)
+        r0 = r0' * r0'
+    in r0 + (1-r0)*(1-cosine)**5
+
+dielectric :: Float -> Material
+dielectric ref_idx = Material scatterFun
+  where
+    scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
+    scatterFun r_in rec =
+        do let attenuation :: V3 Float = 1
+               cosine' = dot (r_in^.direction) (rec^.normal) / sqrt (quadrance (r_in^.direction))
+               (outward_normal, ni_over_nt, cosine) =
+                   if dot (r_in^.direction) (rec^.normal) > 0
+                      then (- rec^.normal, ref_idx, ref_idx * cosine')
+                      else (rec^.normal, 1/ref_idx, -cosine')
+               reflected = reflect (r_in^.direction) (rec^.normal)
+           case refract (r_in^.direction) outward_normal ni_over_nt of
+             Just refracted ->
+                 do let reflect_prob = schlick cosine ref_idx
+                    rnd <- drand48
+                    if rnd < reflect_prob
+                      then pure $ Just (attenuation, Ray (rec^.p) reflected)
+                      else pure $ Just $ (attenuation, Ray (rec^.p) refracted)
+             Nothing -> pure $ Just (attenuation, Ray (rec^.p) reflected)

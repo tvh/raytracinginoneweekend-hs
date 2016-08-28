@@ -34,14 +34,14 @@ color ray world depth =
 main :: IO ()
 main = do
     [out] <- getArgs
-    let nx = 400 :: Int
-        ny = 200 :: Int
+    let nx = 800 :: Int
+        ny = 400 :: Int
         ns = 100 :: Int
         spheres =
             [ Sphere
               { _sphere_center = V3 0 0 (-1)
               , _sphere_radius = 0.5
-              , _sphere_material = lambertian (V3 0.8 0.3 0.3)
+              , _sphere_material = lambertian (V3 0.1 0.2 0.5)
               }
             , Sphere
               { _sphere_center = V3 0 (-100.5) (-1)
@@ -51,12 +51,17 @@ main = do
             , Sphere
               { _sphere_center = V3 1 0 (-1)
               , _sphere_radius = 0.5
-              , _sphere_material = metal (V3 0.8 0.6 0.2)
+              , _sphere_material = metal (V3 0.8 0.6 0.2) 1
               }
             , Sphere
               { _sphere_center = V3 (-1) 0 (-1)
               , _sphere_radius = 0.5
-              , _sphere_material = metal (V3 0.8 0.8 0.8)
+              , _sphere_material = dielectric 1.5
+              }
+            , Sphere
+              { _sphere_center = V3 (-1) 0 (-1)
+              , _sphere_radius = -0.45
+              , _sphere_material = dielectric 1.5
               }
             ]
         world = HitableList $ V.map (HitableItem . hit) spheres

@@ -6,7 +6,9 @@ module RaytracingBook.Monad where
 import Linear
 import Control.Monad.Trans.Reader
 import Control.Monad.Primitive
+import Data.Pool
 import System.Random.MWC
+import System.IO.Unsafe
 
 newtype Rayer a =
     Rayer { unRayer :: ReaderT GenIO IO a }
@@ -16,9 +18,20 @@ instance PrimMonad Rayer where
     type PrimState Rayer = RealWorld
     primitive = Rayer . primitive
 
+{-# NOINLINE gens #-}
+gens :: Pool GenIO
+gens =
+    unsafePerformIO $
+    createPool
+        createSystemRandom
+        (const (return ()))
+        1
+        30
+        128
+
 runRayer :: Rayer a -> IO a
 runRayer (Rayer m) =
-    withSystemRandom $ \gen -> runReaderT m gen
+    withResource gens $ \gen -> runReaderT m gen
 
 {-# INLINE drand48 #-}
 drand48 :: Rayer Float

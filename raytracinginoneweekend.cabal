@@ -19,6 +19,7 @@ library
                      , vector
                      , transformers
                      , primitive
+                     , resource-pool
   exposed-modules:     RaytracingBook.Ray
                      , RaytracingBook.Hitable
                      , RaytracingBook.Sphere
