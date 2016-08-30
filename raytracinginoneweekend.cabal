@@ -12,14 +12,14 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      lib
   ghc-options:         -O2 -Wall
-  build-depends:       linear
+  build-depends:       base
                      , lens
-                     , base
+                     , linear
                      , mwc-random
-                     , vector
-                     , transformers
                      , primitive
                      , resource-pool
+                     , transformers
+                     , vector
   exposed-modules:     RaytracingBook.Ray
                      , RaytracingBook.Hitable
                      , RaytracingBook.Sphere
@@ -32,10 +32,23 @@ executable rayer
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
   build-depends:       base
-                     , linear
-                     , lens
-                     , raytracinginoneweekend
-                     , vector
                      , JuicyPixels
                      , async
+                     , lens
+                     , linear
+                     , raytracinginoneweekend
+                     , vector
+  default-language:    Haskell2010
+
+benchmark prng-bench
+  hs-source-dirs:      src
+  main-is:             Benchmarks.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
+  build-depends:       base
+                     , Xorshift128Plus
+                     , criterion
+                     , mersenne-random
+                     , mersenne-random-pure64
+                     , mwc-random
+                     , random
   default-language:    Haskell2010
