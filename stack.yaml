@@ -1,14 +1,1 @@
-resolver: nightly-2016-08-27
-packages:
-- '.'
-- location:
-    git: https://github.com/tvh/Xorshift128Plus.git
-    commit: a8622ce87571285d8cc573baac4be7abcc322980
-  extra-dep: true
-extra-deps:
-- mersenne-random-pure64-0.2.2.0
-- mersenne-random-1.0.0.1
-flags:
-  mersenne-random:
-    use_sse2: true
-extra-package-dbs: []
+stack7.10.yaml
