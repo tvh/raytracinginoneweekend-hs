@@ -9,8 +9,10 @@ import RaytracingBook.Ray
 import RaytracingBook.Monad
 
 import Linear
+import Linear.Affine
 import Control.Lens
 import Control.Monad
+import Control.Monad.Zip
 import qualified Data.Vector as V
 
 newtype Material =
@@ -19,13 +21,14 @@ newtype Material =
 data HitRecord =
     HitRecord
     { _t :: !Float
-    , _p :: !(V3 Float)
+    , _p :: !(Point V3 Float)
     , _normal :: !(V3 Float)
     , _material :: !Material
     }
 makeLenses ''HitRecord
 
 class Hitable a where
+    -- | Check for a hit
     hit :: a
         -> Ray
         -> Float
@@ -33,12 +36,26 @@ class Hitable a where
         -> Float
         -- ^ t_max
         -> Maybe HitRecord
+    -- | Get the bounding box
+    -- In the result, the first component contains the smaller values
+    boundingBox :: a -> (Point V3 Float, Point V3 Float)
 
-newtype HitableItem =
-    HitableItem { unHitableItem :: Ray -> Float -> Float -> Maybe HitRecord }
+data HitableItem =
+    HitableItem
+    { hi_hitFun :: !(Ray -> Float -> Float -> Maybe HitRecord)
+    , hi_boundingBox :: !(Point V3 Float, Point V3 Float)
+    }
 
 instance Hitable HitableItem where
-    hit = unHitableItem
+    hit = hi_hitFun
+    boundingBox = hi_boundingBox
+
+toHitableItem :: Hitable a => a -> HitableItem
+toHitableItem x =
+    HitableItem
+    { hi_hitFun = hit x
+    , hi_boundingBox = boundingBox x
+    }
 
 newtype HitableList =
     HitableList { unHitableList :: V.Vector HitableItem }
@@ -48,12 +65,16 @@ instance Hitable HitableList where
         V.foldl' merge Nothing v
       where
         merge :: Maybe HitRecord -> HitableItem -> Maybe HitRecord
-        merge mClosest (HitableItem hitFun) =
+        merge mClosest (HitableItem hitFun _) =
             let closest_t =
                     case mClosest of
                       Just closest -> closest^.t
                       Nothing -> t_max
             in hitFun ray t_min closest_t `mplus` mClosest
+    boundingBox (HitableList v) =
+        V.foldl1'
+            (\(P l1, P u1) (P l2, P u2) -> (P $ mzipWith min l1 l2, P $ mzipWith max u1 u2))
+            (V.map boundingBox v)
 
 lambertian :: V3 Float -> Material
 lambertian albedo = Material scatterFun
@@ -61,8 +82,8 @@ lambertian albedo = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun _r_in rec =
         do rnd <- randomInUnitSphere
-           let target = rec^.p + rec^.normal + rnd
-               scattered = Ray (rec^.p) (target - rec^.p)
+           let target = rec^.p + rec^.normal.from _Point + rnd^.from _Point
+               scattered = Ray (rec^.p) (target .-. rec^.p)
                attenuation = albedo
            pure (Just (attenuation, scattered))
 
@@ -77,10 +98,10 @@ metal albedo fuzz' = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun r_in rec =
         do rnd <- randomInUnitSphere
-           let reflected = reflect (normalize (r_in^.direction)) (rec^.normal)
+           let reflected = reflect (normalize (r_in^.ray_direction)) (rec^.normal)
                scattered = Ray (rec^.p) (reflected + fuzz*^rnd)
                attenuation = albedo
-               res = if dot (scattered^.direction) (rec^.normal) > 0
+               res = if dot (scattered^.ray_direction) (rec^.normal) > 0
                      then Just (attenuation, scattered)
                      else Nothing
            pure res
@@ -106,13 +127,13 @@ dielectric ref_idx = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun r_in rec =
         do let attenuation :: V3 Float = 1
-               cosine' = dot (r_in^.direction) (rec^.normal) / sqrt (quadrance (r_in^.direction))
+               cosine' = dot (r_in^.ray_direction) (rec^.normal) / sqrt (quadrance (r_in^.ray_direction))
                (outward_normal, ni_over_nt, cosine) =
-                   if dot (r_in^.direction) (rec^.normal) > 0
+                   if dot (r_in^.ray_direction) (rec^.normal) > 0
                       then (- rec^.normal, ref_idx, ref_idx * cosine')
                       else (rec^.normal, 1/ref_idx, -cosine')
-               reflected = reflect (r_in^.direction) (rec^.normal)
-           case refract (r_in^.direction) outward_normal ni_over_nt of
+               reflected = reflect (r_in^.ray_direction) (rec^.normal)
+           case refract (r_in^.ray_direction) outward_normal ni_over_nt of
              Just refracted ->
                  do let reflect_prob = schlick cosine ref_idx
                     rnd <- drand48

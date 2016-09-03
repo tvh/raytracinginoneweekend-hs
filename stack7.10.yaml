@@ -6,8 +6,12 @@ packages:
     commit: a8622ce87571285d8cc573baac4be7abcc322980
   extra-dep: true
 extra-deps:
-- mersenne-random-pure64-0.2.2.0
+- async-pool-0.9.0
+- friday-0.2.2.0
+- friday-devil-0.1.1.1
 - mersenne-random-1.0.0.1
+- mersenne-random-pure64-0.2.2.0
+- ratio-int-0.1.2
 flags:
   mersenne-random:
     use_sse2: true

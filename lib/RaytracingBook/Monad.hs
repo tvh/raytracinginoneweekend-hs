@@ -11,7 +11,9 @@ import System.IO.Unsafe
 
 newtype Rayer a =
     Rayer { unRayer :: ReaderT MWC.GenIO IO a }
-    deriving (Functor, Applicative, Monad)
+    deriving (Functor, Applicative, Monad, MonadIO)
+
+
 
 {-# NOINLINE gens #-}
 gens :: Pool MWC.GenIO

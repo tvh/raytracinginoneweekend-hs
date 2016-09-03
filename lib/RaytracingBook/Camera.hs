@@ -6,6 +6,7 @@ import RaytracingBook.Monad
 import RaytracingBook.Ray
 
 import Linear
+import Linear.Affine
 import Control.Lens
 
 newtype Camera =
@@ -13,8 +14,8 @@ newtype Camera =
 
 data CameraOpts =
     CameraOpts
-    { _lookfrom :: !(V3 Float)
-    , _lookat :: !(V3 Float)
+    { _lookfrom :: !(Point V3 Float)
+    , _lookat :: !(Point V3 Float)
     , _vup :: !(V3 Float)
     , _hfov :: !Float
     , _aspect :: !Float
@@ -26,8 +27,8 @@ makeLenses ''CameraOpts
 defaultCameraOpts :: CameraOpts
 defaultCameraOpts =
     CameraOpts
-    { _lookfrom = V3 0 0 0
-    , _lookat = V3 0 0 (-1)
+    { _lookfrom = P (V3 0 0 0)
+    , _lookat = P (V3 0 0 (-1))
     , _vup = V3 0 1 0
     , _hfov = 120
     , _aspect = 4/3
@@ -41,10 +42,10 @@ getCamera opts =
         theta = opts^.hfov*pi/180
         half_width = tan (theta/2)
         half_height = half_width/opts^.aspect
-        w = normalize (opts^.lookfrom - opts^.lookat)
+        w = normalize (opts^.lookfrom .-. opts^.lookat)
         u = normalize (cross (opts^.vup) w)
         v = cross w u
-        lower_left_corner = opts^.lookfrom - half_width*opts^.focusDist*^u - half_height*opts^.focusDist*^v - opts^.focusDist*^w
+        lower_left_corner = opts^.lookfrom .-^ half_width*opts^.focusDist*^u .-^ half_height*opts^.focusDist*^v .-^ opts^.focusDist*^w
         horizontal = 2*half_width*opts^.focusDist *^ u
         vertical = 2*half_height*opts^.focusDist *^ v
         camera_origin = opts^.lookfrom
@@ -52,12 +53,12 @@ getCamera opts =
             rd <- (lens_radius *^) <$> randomInUnitDisk
             let offset = u ^* rd^._x + v ^* rd^._y
             pure Ray
-                 { _origin = camera_origin + offset
-                 , _direction =
+                 { _ray_origin = camera_origin .+^ offset
+                 , _ray_direction =
                       lower_left_corner
-                      + (s *^ horizontal)
-                      + (t *^ vertical)
-                      - camera_origin
+                      .+^ (s *^ horizontal)
+                      .+^ (t *^ vertical)
+                      .-. camera_origin
                       - offset
                  }
     in Camera
