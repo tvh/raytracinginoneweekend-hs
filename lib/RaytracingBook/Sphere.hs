@@ -5,6 +5,7 @@
 module RaytracingBook.Sphere where
 
 import RaytracingBook.Hitable
+import RaytracingBook.BVH
 import RaytracingBook.Ray
 
 import Linear
@@ -16,7 +17,7 @@ data Sphere =
     Sphere
     { _sphere_center :: !(Point V3 Float)
     , _sphere_radius :: !Float
-    , _sphere_material :: Material
+    , _sphere_material :: !Material
     }
 makeLenses ''Sphere
 
@@ -25,7 +26,7 @@ instance Hitable Sphere where
         do let oc = ray^.ray_origin .-. sphere^.sphere_center
                a = quadrance (ray^.ray_direction)
                b = dot oc (ray^.ray_direction)
-               c = quadrance oc - (sphere^.sphere_radius)^2
+               c = quadrance oc - (sphere^.sphere_radius)*(sphere^.sphere_radius)
                discriminant = b*b - a*c
            guard (discriminant > 0)
            let temp1 = ((-b) - sqrt (b*b-a*c)) / a
@@ -42,7 +43,12 @@ instance Hitable Sphere where
                 , _normal = rec_normal
                 , _material = sphere^.sphere_material
                 }
+
+instance BoundedHitable Sphere where
+    {-# INLINE boundingBox #-}
     boundingBox sphere =
         ( sphere^.sphere_center .-^ pure (sphere^.sphere_radius)
         , sphere^.sphere_center .+^ pure (sphere^.sphere_radius)
         )
+    {-# INLINE centroid #-}
+    centroid sphere = sphere^.sphere_center

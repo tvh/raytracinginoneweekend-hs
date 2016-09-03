@@ -20,7 +20,9 @@ library
                      , resource-pool
                      , transformers
                      , vector
+                     , vector-algorithms
   exposed-modules:     RaytracingBook.Ray
+                     , RaytracingBook.BVH
                      , RaytracingBook.Hitable
                      , RaytracingBook.Sphere
                      , RaytracingBook.Camera

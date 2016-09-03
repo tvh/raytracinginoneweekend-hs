@@ -47,7 +47,6 @@ xorShift64 !x1 =
         !x4 = x3 `xor` shiftL x3 17
     in x4
 
-
 main :: IO ()
 main =
     defaultMain

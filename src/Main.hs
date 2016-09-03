@@ -4,6 +4,7 @@
 module Main where
 
 import RaytracingBook.Camera
+import RaytracingBook.BVH
 import RaytracingBook.Hitable
 import RaytracingBook.Monad
 import RaytracingBook.Ray
@@ -25,11 +26,11 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 
-color :: Ray -> HitableList -> Word -> Rayer (V3 Float)
+color :: Hitable h => Ray -> h -> Word -> Rayer (V3 Float)
 color ray world depth =
     case hit world ray (0.0001) 10000 of
       Just rec
-          | depth < 50 -> do
+          | depth < 5 -> do
               mScattered <- scatter (rec ^.material) ray rec
               case mScattered of
                 Just (attenuation, scattered) ->
@@ -73,7 +74,7 @@ randomSphere = do
          , _sphere_material = mat
          }
 
-randomWorld :: Int -> Rayer HitableList
+randomWorld :: Int -> Rayer BoundingBox
 randomWorld n = do
     let ground =
             Sphere
@@ -82,7 +83,7 @@ randomWorld n = do
             , _sphere_material = lambertian (V3 0.8 0.8 0.0)
             }
     marbles <- V.replicateM n randomSphere
-    pure $ HitableList $ V.map toHitableItem $ ground `V.cons` marbles
+    pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
 
 computeImage :: Int -> Int -> Task FR.RGB
 computeImage nx ny = do
@@ -96,7 +97,7 @@ computeImage nx ny = do
             & hfov .~ 120
         cam = getCamera camOpts
     liftIO $ putStrLn "Generating World"
-    world <- liftIO $ runRayer (randomWorld 100)
+    world <- liftIO $ runRayer (randomWorld 300)
     let chunk_length = 262144
         chunks = (nx*ny+chunk_length-1) `div` chunk_length
         chunk_upper n
@@ -115,6 +116,7 @@ computeImage nx ny = do
                 liftIO $ VSM.unsafeWrite buffer n (FR.RGBPixel r g b)
             liftIO $ putChar '.'
     pixelData <- liftIO $ VS.unsafeFreeze buffer
+    liftIO $ putStrLn "Done"
     return $! FR.Manifest (FR.ix2 ny nx) pixelData
 
 main :: IO ()

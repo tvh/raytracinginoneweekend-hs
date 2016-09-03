@@ -12,7 +12,6 @@ import Linear
 import Linear.Affine
 import Control.Lens
 import Control.Monad
-import Control.Monad.Zip
 import qualified Data.Vector as V
 
 newtype Material =
@@ -36,26 +35,15 @@ class Hitable a where
         -> Float
         -- ^ t_max
         -> Maybe HitRecord
-    -- | Get the bounding box
-    -- In the result, the first component contains the smaller values
-    boundingBox :: a -> (Point V3 Float, Point V3 Float)
 
 data HitableItem =
     HitableItem
     { hi_hitFun :: !(Ray -> Float -> Float -> Maybe HitRecord)
-    , hi_boundingBox :: !(Point V3 Float, Point V3 Float)
     }
 
 instance Hitable HitableItem where
     hit = hi_hitFun
-    boundingBox = hi_boundingBox
-
-toHitableItem :: Hitable a => a -> HitableItem
-toHitableItem x =
-    HitableItem
-    { hi_hitFun = hit x
-    , hi_boundingBox = boundingBox x
-    }
+    {-# INLINE hit #-}
 
 newtype HitableList =
     HitableList { unHitableList :: V.Vector HitableItem }
@@ -65,16 +53,12 @@ instance Hitable HitableList where
         V.foldl' merge Nothing v
       where
         merge :: Maybe HitRecord -> HitableItem -> Maybe HitRecord
-        merge mClosest (HitableItem hitFun _) =
+        merge mClosest (HitableItem hitFun) =
             let closest_t =
                     case mClosest of
                       Just closest -> closest^.t
                       Nothing -> t_max
             in hitFun ray t_min closest_t `mplus` mClosest
-    boundingBox (HitableList v) =
-        V.foldl1'
-            (\(P l1, P u1) (P l2, P u2) -> (P $ mzipWith min l1 l2, P $ mzipWith max u1 u2))
-            (V.map boundingBox v)
 
 lambertian :: V3 Float -> Material
 lambertian albedo = Material scatterFun
