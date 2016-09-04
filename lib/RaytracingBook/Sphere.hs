@@ -38,10 +38,10 @@ instance Hitable Sphere where
            let rec_p = pointAtParameter ray rec_t
                rec_normal = (rec_p .-. sphere^.sphere_center) ^/ sphere^.sphere_radius
            Just HitRecord
-                { _t = rec_t
-                , _p = rec_p
-                , _normal = rec_normal
-                , _material = sphere^.sphere_material
+                { _hit_t = rec_t
+                , _hit_p = rec_p
+                , _hit_normal = rec_normal
+                , _hit_material = sphere^.sphere_material
                 }
 
 instance BoundedHitable Sphere where

@@ -70,7 +70,7 @@ instance Hitable BoundingBox where
         merge :: Float -> (Float, Maybe HitRecord) -> BoundedHitableItem -> (Float, Maybe HitRecord)
         merge t_min (t_max, mClosest) item = do
             case hit item ray t_min t_max `mplus` mClosest of
-              Just closest -> (closest^.t, Just closest)
+              Just closest -> (closest^.hit_t, Just closest)
               Nothing -> (t_max, Nothing)
 
 instance BoundedHitable BoundingBox where

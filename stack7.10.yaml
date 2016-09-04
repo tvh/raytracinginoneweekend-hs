@@ -9,6 +9,7 @@ extra-deps:
 - async-pool-0.9.0
 - friday-0.2.2.0
 - friday-devil-0.1.1.1
+- friday-juicypixels-0.1.2
 - mersenne-random-1.0.0.1
 - mersenne-random-pure64-0.2.2.0
 - ratio-int-0.1.2

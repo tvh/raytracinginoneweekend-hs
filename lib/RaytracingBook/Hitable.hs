@@ -19,10 +19,10 @@ newtype Material =
 
 data HitRecord =
     HitRecord
-    { _t :: !Float
-    , _p :: !(Point V3 Float)
-    , _normal :: !(V3 Float)
-    , _material :: !Material
+    { _hit_t :: !Float
+    , _hit_p :: !(Point V3 Float)
+    , _hit_normal :: !(V3 Float)
+    , _hit_material :: !Material
     }
 makeLenses ''HitRecord
 
@@ -56,7 +56,7 @@ instance Hitable HitableList where
         merge mClosest (HitableItem hitFun) =
             let closest_t =
                     case mClosest of
-                      Just closest -> closest^.t
+                      Just closest -> closest^.hit_t
                       Nothing -> t_max
             in hitFun ray t_min closest_t `mplus` mClosest
 
@@ -66,8 +66,8 @@ lambertian albedo = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun _r_in rec =
         do rnd <- randomInUnitSphere
-           let target = rec^.p + rec^.normal.from _Point + rnd^.from _Point
-               scattered = Ray (rec^.p) (target .-. rec^.p)
+           let target = rec^.hit_p + rec^.hit_normal.from _Point + rnd^.from _Point
+               scattered = Ray (rec^.hit_p) (target .-. rec^.hit_p)
                attenuation = albedo
            pure (Just (attenuation, scattered))
 
@@ -82,10 +82,10 @@ metal albedo fuzz' = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun r_in rec =
         do rnd <- randomInUnitSphere
-           let reflected = reflect (normalize (r_in^.ray_direction)) (rec^.normal)
-               scattered = Ray (rec^.p) (reflected + fuzz*^rnd)
+           let reflected = reflect (normalize (r_in^.ray_direction)) (rec^.hit_normal)
+               scattered = Ray (rec^.hit_p) (reflected + fuzz*^rnd)
                attenuation = albedo
-               res = if dot (scattered^.ray_direction) (rec^.normal) > 0
+               res = if dot (scattered^.ray_direction) (rec^.hit_normal) > 0
                      then Just (attenuation, scattered)
                      else Nothing
            pure res
@@ -111,17 +111,17 @@ dielectric ref_idx = Material scatterFun
     scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
     scatterFun r_in rec =
         do let attenuation :: V3 Float = 1
-               cosine' = dot (r_in^.ray_direction) (rec^.normal) / sqrt (quadrance (r_in^.ray_direction))
+               cosine' = dot (r_in^.ray_direction) (rec^.hit_normal) / sqrt (quadrance (r_in^.ray_direction))
                (outward_normal, ni_over_nt, cosine) =
-                   if dot (r_in^.ray_direction) (rec^.normal) > 0
-                      then (- rec^.normal, ref_idx, ref_idx * cosine')
-                      else (rec^.normal, 1/ref_idx, -cosine')
-               reflected = reflect (r_in^.ray_direction) (rec^.normal)
+                   if dot (r_in^.ray_direction) (rec^.hit_normal) > 0
+                      then (- rec^.hit_normal, ref_idx, ref_idx * cosine')
+                      else (rec^.hit_normal, 1/ref_idx, -cosine')
+               reflected = reflect (r_in^.ray_direction) (rec^.hit_normal)
            case refract (r_in^.ray_direction) outward_normal ni_over_nt of
              Just refracted ->
                  do let reflect_prob = schlick cosine ref_idx
                     rnd <- drand48
                     if rnd < reflect_prob
-                      then pure $ Just (attenuation, Ray (rec^.p) reflected)
-                      else pure $ Just $ (attenuation, Ray (rec^.p) refracted)
-             Nothing -> pure $ Just (attenuation, Ray (rec^.p) reflected)
+                      then pure $ Just (attenuation, Ray (rec^.hit_p) reflected)
+                      else pure $ Just $ (attenuation, Ray (rec^.hit_p) refracted)
+             Nothing -> pure $ Just (attenuation, Ray (rec^.hit_p) reflected)

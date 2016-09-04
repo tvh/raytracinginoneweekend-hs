@@ -7,6 +7,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
 import Data.Pool
 import qualified System.Random.MWC as MWC
+import qualified System.Random.MWC.Distributions as MWC
 import System.IO.Unsafe
 
 newtype Rayer a =
@@ -48,6 +49,17 @@ drand48 :: Rayer Float
 drand48 = do
     res <- uniform
     pure (res - 2**(-33))
+
+{-# INLINE normal #-}
+normal :: Float -> Float -> Rayer Float
+normal mean std =
+    let mean' = realToFrac mean
+        std' = realToFrac std
+    in realToFrac <$> liftRandomFun (MWC.normal mean' std')
+
+{-# INLINE standard #-}
+standard :: Rayer Float
+standard = realToFrac <$> liftRandomFun MWC.standard
 
 {-# INLINE randomInUnitSphere #-}
 randomInUnitSphere :: Rayer (V3 Float)

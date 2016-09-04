@@ -19,8 +19,10 @@ import Linear
 import Linear.Affine
 import System.Environment
 import System.IO
-import qualified Vision.Primitive as FR
-import qualified Vision.Image as FR
+import Unsafe.Coerce
+import qualified Codec.Picture as JP
+import qualified Codec.Picture.Types as JP
+import qualified Vision.Image.JuicyPixels as FR
 import qualified Vision.Image.Storage.DevIL as FR
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
@@ -31,7 +33,7 @@ color ray world depth =
     case hit world ray (0.0001) 10000 of
       Just rec
           | depth < 5 -> do
-              mScattered <- scatter (rec ^.material) ray rec
+              mScattered <- scatter (rec ^.hit_material) ray rec
               case mScattered of
                 Just (attenuation, scattered) ->
                     (attenuation *) <$> color scattered world (depth+1)
@@ -78,57 +80,68 @@ randomWorld :: Int -> Rayer BoundingBox
 randomWorld n = do
     let ground =
             Sphere
-            { _sphere_center = P (V3 0 (-500) (-1))
-            , _sphere_radius = 500
+            { _sphere_center = P (V3 0 (-10000) (-1))
+            , _sphere_radius = 10000
             , _sphere_material = lambertian (V3 0.8 0.8 0.0)
             }
     marbles <- V.replicateM n randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
 
-computeImage :: Int -> Int -> Task FR.RGB
-computeImage nx ny = do
+computeImage :: Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF)
+computeImage nx ny ns = do
     let camOpts =
             defaultCameraOpts
-            & lookfrom .~ P (V3 3 3 2)
-            & lookat .~ P (V3 0 0 (-1))
+            & lookfrom .~ P (V3 4 4 4)
+            & lookat .~ P (V3 0 0 0)
             & focusDist .~ sqrt (quadrance (V3 3 3 2 - V3 0 0 (-1)))
-            & aperture .~ 0.1
+            & aperture .~ 0
             & aspect .~ fromIntegral nx / fromIntegral ny
             & hfov .~ 120
         cam = getCamera camOpts
     liftIO $ putStrLn "Generating World"
-    world <- liftIO $ runRayer (randomWorld 300)
-    let chunk_length = 262144
+    world <- liftIO $ runRayer (randomWorld 100)
+    let chunk_length = max 64 ((262144+ns-1) `div` ns)
         chunks = (nx*ny+chunk_length-1) `div` chunk_length
         chunk_upper n
             | n<chunks-1 = (n+1)*chunk_length-1
             | otherwise = nx*ny
     liftIO $ putStr "Computing Samples "
-    buffer <- liftIO $ VSM.new (nx*ny)
+    buffer <- liftIO $ (VSM.new (nx*ny) :: IO (VSM.IOVector (V3 Float)))
+    let inv_nx = 1/fromIntegral nx
+        inv_ny = 1/fromIntegral ny
+    sample_offsets <- liftIO . runRayer $
+        VS.replicateM ns $ V2 <$> normal 0 (inv_nx/2) <*> normal 0 (inv_nx/2)
     for_ [0..chunks-1] $ \chunk ->
         liftIO . runRayer $ do
             for_ [chunk*chunk_length..chunk_upper chunk] $ \n -> do
                 let (j,i) = n `quotRem` nx
-                let u = fromIntegral i / fromIntegral nx
-                    v = fromIntegral (ny - j) / fromIntegral ny
-                ray <- getRay cam u v
-                V3 r g b <- fmap round . (* 255) <$> color ray world 0
-                liftIO $ VSM.unsafeWrite buffer n (FR.RGBPixel r g b)
+                    u = fromIntegral i * inv_nx
+                    v = fromIntegral (ny - j) * inv_ny
+                samples <- VS.forM sample_offsets $ \(V2 uD vD) -> do
+                    let u' = u + uD
+                        v' = v + vD
+                    ray <- getRay cam u' v'
+                    color ray world 0
+                liftIO $ VSM.unsafeWrite buffer n $ (/fromIntegral ns) $ VS.sum samples
             liftIO $ putChar '.'
     pixelData <- liftIO $ VS.unsafeFreeze buffer
+    let pixelData' = unsafeCoerce pixelData -- Trust me
     liftIO $ putStrLn "Done"
-    return $! FR.Manifest (FR.ix2 ny nx) pixelData
+    return $! JP.Image nx ny pixelData'
 
 main :: IO ()
 main = do
+    [out] <- liftIO getArgs
     hSetBuffering stdout NoBuffering
     nt <- getNumCapabilities
     let nx = 1920 :: Int
         ny = 1080 :: Int
-        samples_root = 4 :: Int
-    image <- withTaskGroup nt $ \tg -> runTask tg $ computeImage (nx*samples_root) (ny*samples_root)
-    [out] <- liftIO getArgs
-    res <- liftIO $ FR.save FR.Autodetect out $ image
+        samples = 10 :: Int
+    image <- withTaskGroup nt $ \tg -> runTask tg $ computeImage nx ny samples
+    let image_corrected = JP.gammaCorrection 2 image
+        image_8 = JP.convertRGB8 $ JP.ImageRGBF image_corrected
+        imageFriday = FR.toFridayRGB image_8
+    res <- liftIO $ FR.save FR.Autodetect out $ imageFriday
     case res of
       Just err -> print err
       Nothing -> putStrLn $ "Saved as " ++ out

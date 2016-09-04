@@ -2,6 +2,7 @@
 module Main where
 
 import qualified System.Random.MWC as MWC
+import qualified System.Random.MWC.Distributions as MWC
 import qualified System.Random.Mersenne as MR
 import qualified System.Random.Mersenne.Pure64 as MRP
 import System.IO.Unsafe
@@ -54,6 +55,8 @@ main =
     , bench "MWC.uniform (Word64)" $ nfIO (MWC.uniform genMWC :: IO Word64)
     , bench "MWC.uniform (Float)" $ nfIO (MWC.uniform genMWC :: IO Float)
     , bench "MWC.uniform (Double)" $ nfIO (MWC.uniform genMWC :: IO Double)
+    , bench "MWC.standard (Double)" $ nfIO (MWC.standard genMWC :: IO Double)
+    , bench "MWC.normal (Double)" $ nfIO (MWC.normal 2 2 genMWC :: IO Double)
     , bench "MR.randomIO (Word64)" $ nfIO (MR.randomIO :: IO Word64)
     , bench "MR.randomIO (Double)" $ nfIO (MR.randomIO :: IO Double)
     , bench "MR.random (Word64)" $ nfIO (MR.random genMR :: IO Word64)
