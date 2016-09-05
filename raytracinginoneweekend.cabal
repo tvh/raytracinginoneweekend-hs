@@ -42,6 +42,7 @@ executable rayer
                      , lens
                      , linear
                      , mwc-random
+                     , optparse-applicative
                      , raytracinginoneweekend
                      , stm
                      , transformers

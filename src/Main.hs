@@ -16,9 +16,9 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Data.Foldable
 import Data.Proxy
+import Options.Applicative
 import Linear
 import Linear.Affine
-import System.Environment
 import System.IO
 import Unsafe.Coerce
 import qualified Codec.Picture as JP
@@ -34,7 +34,7 @@ color :: (Floating f, Hitable f h, Epsilon f, Real f) => Ray f -> h -> Word -> R
 color ray world depth =
     case hit world ray (0.0001) 10000 of
       Just rec
-          | depth < 5 -> do
+          | depth < 50 -> do
               mScattered <- scatter (rec ^.hit_material) ray rec
               case mScattered of
                 Just (attenuation, scattered) ->
@@ -93,12 +93,12 @@ computeImage :: forall f. (Floating f, Ord f, MWC.Variate f, Epsilon f, VSM.Stor
 computeImage _ nx ny ns = do
     let camOpts =
             defaultCameraOpts
-            & lookfrom .~ P (V3 4 4 4)
-            & lookat .~ P (V3 0 0 0)
-            & focusDist .~ sqrt (quadrance (V3 3 3 2 - V3 0 0 (-1)))
-            & aperture .~ 0
+            & lookfrom .~ P (V3 10 4 10)
+            & lookat .~ P (V3 2 0 2)
+            & focusDist .~ sqrt (quadrance (V3 10 4 10 - V3 2 0 2))
+            & aperture .~ 0.03
             & aspect .~ fromIntegral nx / fromIntegral ny
-            & hfov .~ 120
+            & hfov .~ 100
         cam = getCamera camOpts
     liftIO $ putStrLn "Generating World"
     world <- liftIO $ runRayer (randomWorld 100) :: Task (BoundingBox f)
@@ -131,19 +131,59 @@ computeImage _ nx ny ns = do
     liftIO $ putStrLn "Done"
     return $! JP.Image nx ny pixelData'
 
+data RenderingOpts =
+    RenderingOpts
+    { opts_width :: Int
+    , opts_height :: Int
+    , opts_samples :: Int
+    , opts_output :: FilePath
+    , opts_useFloat :: Bool
+    }
+
+parseOpts :: Parser RenderingOpts
+parseOpts =
+    RenderingOpts
+    <$> option auto
+        ( long "width"
+       <> metavar "WIDTH"
+       <> help "Width in pixels"
+       <> value 800 )
+    <*> option auto
+        ( long "height"
+       <> metavar "HEIGHT"
+       <> help "Height in pixels"
+       <> value 600 )
+    <*> option auto
+        ( long "samples"
+       <> metavar "SAMPLES"
+       <> help "Number of samples per pixel"
+       <> value 10 )
+    <*> strOption
+        ( long "output"
+       <> metavar "FILEPATH"
+       <> help "Filename to write the result to" )
+    <*> switch
+        ( long "use-float"
+       <> help "Use Float for Rays" )
+
 main :: IO ()
 main = do
-    [out] <- liftIO getArgs
+    let optsP = info (helper <*> parseOpts)
+            ( fullDesc )
+    opts <- execParser optsP
+    let nx = opts_width opts
+        ny = opts_height opts
+        samples = opts_samples opts
     hSetBuffering stdout NoBuffering
     nt <- getNumCapabilities
-    let nx = 1920 :: Int
-        ny = 1080 :: Int
-        samples = 10 :: Int
-        wittness = Proxy :: Proxy Double
-    image <- withTaskGroup nt $ \tg -> runTask tg $ computeImage wittness nx ny samples
+    image <- withTaskGroup nt $ \tg -> runTask tg $
+        if opts_useFloat opts
+           then computeImage (Proxy :: Proxy Float) nx ny samples
+           else computeImage (Proxy :: Proxy Double) nx ny samples
     let image_corrected = JP.gammaCorrection 2 image
         image_8 = JP.convertRGB8 $ JP.ImageRGBF image_corrected
         imageFriday = FR.toFridayRGB image_8
+        out = opts_output opts
     res <- liftIO $ FR.save FR.Autodetect out $ imageFriday
     case res of
       Just err -> print err
