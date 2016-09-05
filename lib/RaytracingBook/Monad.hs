@@ -14,8 +14,6 @@ newtype Rayer a =
     Rayer { unRayer :: ReaderT MWC.GenIO IO a }
     deriving (Functor, Applicative, Monad, MonadIO)
 
-
-
 {-# NOINLINE gens #-}
 gens :: Pool MWC.GenIO
 gens =
@@ -37,32 +35,26 @@ liftRandomFun :: (MWC.GenIO -> IO a) -> Rayer a
 liftRandomFun f = Rayer ask >>= Rayer . liftIO . f
 
 {-# INLINE uniform #-}
-uniform :: Rayer Float
+uniform :: MWC.Variate f => Rayer f
 uniform = liftRandomFun MWC.uniform
 
 {-# INLINE uniformR #-}
-uniformR :: (Float, Float) -> Rayer Float
+uniformR :: MWC.Variate f => (f, f) -> Rayer f
 uniformR bounds = liftRandomFun (MWC.uniformR bounds)
 
-{-# INLINE drand48 #-}
-drand48 :: Rayer Float
-drand48 = do
-    res <- uniform
-    pure (res - 2**(-33))
-
 {-# INLINE normal #-}
-normal :: Float -> Float -> Rayer Float
+normal :: (Real f, Fractional f) => f -> f -> Rayer f
 normal mean std =
     let mean' = realToFrac mean
         std' = realToFrac std
     in realToFrac <$> liftRandomFun (MWC.normal mean' std')
 
 {-# INLINE standard #-}
-standard :: Rayer Float
+standard :: Fractional f => Rayer f
 standard = realToFrac <$> liftRandomFun MWC.standard
 
 {-# INLINE randomInUnitSphere #-}
-randomInUnitSphere :: Rayer (V3 Float)
+randomInUnitSphere :: (MWC.Variate f, Fractional f, Ord f) => Rayer (V3 f)
 randomInUnitSphere = do
     res <- V3 <$> uniformR (-1,1) <*> uniformR (-1,1) <*> uniformR (-1,1)
     if quadrance res >= 1
@@ -70,7 +62,7 @@ randomInUnitSphere = do
       else pure res
 
 {-# INLINE randomInUnitDisk #-}
-randomInUnitDisk :: Rayer (V3 Float)
+randomInUnitDisk :: (MWC.Variate f, Fractional f, Ord f) => Rayer (V3 f)
 randomInUnitDisk = do
     res <- V3 <$> uniformR (-1,1) <*> uniformR (-1,1) <*> pure 0
     if dot res res >= 1

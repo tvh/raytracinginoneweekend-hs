@@ -15,6 +15,7 @@ import Control.Concurrent.Async.Pool
 import Control.Lens
 import Control.Monad.IO.Class
 import Data.Foldable
+import Data.Proxy
 import Linear
 import Linear.Affine
 import System.Environment
@@ -27,8 +28,9 @@ import qualified Vision.Image.Storage.DevIL as FR
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
+import qualified System.Random.MWC as MWC
 
-color :: Hitable h => Ray -> h -> Word -> Rayer (V3 Float)
+color :: (Floating f, Hitable f h, Epsilon f, Real f) => Ray f -> h -> Word -> Rayer (V3 Float)
 color ray world depth =
     case hit world ray (0.0001) 10000 of
       Just rec
@@ -40,20 +42,20 @@ color ray world depth =
                 Nothing -> pure 0
           | otherwise -> pure 0
       Nothing -> pure $
-          let unit_direction = normalize $ ray^.ray_direction
+          let unit_direction = normalize $ fmap realToFrac $ ray^.ray_direction
               t = 0.5 * unit_direction^._y+1
           in (1-t)*^V3 1 1 1 + t*^V3 0.5 0.7 1.0
 
-randomCoordinate :: Float -> Rayer (Point V3 Float)
+randomCoordinate :: (MWC.Variate f, Num f) => f -> Rayer (Point V3 f)
 randomCoordinate radius =
     P <$> (V3 <$> uniformR (-10,10) <*> pure radius <*> uniformR (-10,10))
 
-randomColor :: Rayer (V3 Float)
+randomColor :: MWC.Variate f => Rayer (V3 f)
 randomColor = V3 <$> uniform <*> uniform <*> uniform
 
-randomMaterial :: Rayer Material
+randomMaterial :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Material f)
 randomMaterial = do
-    rnd <- uniform
+    rnd <- uniform :: Rayer Float
     if | rnd < 0.4 -> do
            col <- randomColor
            pure $ lambertian col
@@ -65,7 +67,7 @@ randomMaterial = do
            nt <- uniformR (1.3,2)
            pure $ dielectric nt
 
-randomSphere :: Rayer Sphere
+randomSphere :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Sphere f)
 randomSphere = do
     rad <- uniformR (0.2,0.6)
     coord <- randomCoordinate rad
@@ -76,7 +78,7 @@ randomSphere = do
          , _sphere_material = mat
          }
 
-randomWorld :: Int -> Rayer BoundingBox
+randomWorld :: (Floating f, Ord f, MWC.Variate f, Epsilon f) => Int -> Rayer (BoundingBox f)
 randomWorld n = do
     let ground =
             Sphere
@@ -87,8 +89,8 @@ randomWorld n = do
     marbles <- V.replicateM n randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
 
-computeImage :: Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF)
-computeImage nx ny ns = do
+computeImage :: forall f. (Floating f, Ord f, MWC.Variate f, Epsilon f, VSM.Storable f, Real f) => Proxy f -> Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF)
+computeImage _ nx ny ns = do
     let camOpts =
             defaultCameraOpts
             & lookfrom .~ P (V3 4 4 4)
@@ -99,7 +101,7 @@ computeImage nx ny ns = do
             & hfov .~ 120
         cam = getCamera camOpts
     liftIO $ putStrLn "Generating World"
-    world <- liftIO $ runRayer (randomWorld 100)
+    world <- liftIO $ runRayer (randomWorld 100) :: Task (BoundingBox f)
     let chunk_length = max 64 ((262144+ns-1) `div` ns)
         chunks = (nx*ny+chunk_length-1) `div` chunk_length
         chunk_upper n
@@ -137,7 +139,8 @@ main = do
     let nx = 1920 :: Int
         ny = 1080 :: Int
         samples = 10 :: Int
-    image <- withTaskGroup nt $ \tg -> runTask tg $ computeImage nx ny samples
+        wittness = Proxy :: Proxy Double
+    image <- withTaskGroup nt $ \tg -> runTask tg $ computeImage wittness nx ny samples
     let image_corrected = JP.gammaCorrection 2 image
         image_8 = JP.convertRGB8 $ JP.ImageRGBF image_corrected
         imageFriday = FR.toFridayRGB image_8

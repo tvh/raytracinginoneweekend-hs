@@ -8,23 +8,24 @@ import RaytracingBook.Ray
 import Linear
 import Linear.Affine
 import Control.Lens
+import qualified System.Random.MWC as MWC
 
-newtype Camera =
-    Camera { getRay :: Float -> Float -> Rayer Ray }
+newtype Camera f =
+    Camera { getRay :: f -> f -> Rayer (Ray f) }
 
-data CameraOpts =
+data CameraOpts f =
     CameraOpts
-    { _lookfrom :: !(Point V3 Float)
-    , _lookat :: !(Point V3 Float)
-    , _vup :: !(V3 Float)
-    , _hfov :: !Float
-    , _aspect :: !Float
-    , _aperture :: !Float
-    , _focusDist :: !Float
+    { _lookfrom :: !(Point V3 f)
+    , _lookat :: !(Point V3 f)
+    , _vup :: !(V3 f)
+    , _hfov :: !f
+    , _aspect :: !f
+    , _aperture :: !f
+    , _focusDist :: !f
     }
 makeLenses ''CameraOpts
 
-defaultCameraOpts :: CameraOpts
+defaultCameraOpts :: Fractional f => CameraOpts f
 defaultCameraOpts =
     CameraOpts
     { _lookfrom = P (V3 0 0 0)
@@ -36,7 +37,7 @@ defaultCameraOpts =
     , _focusDist = 1
     }
 
-getCamera :: CameraOpts -> Camera
+getCamera :: (Epsilon f, Floating f, Ord f, MWC.Variate f) => CameraOpts f -> Camera f
 getCamera opts =
     let lens_radius = opts^.aperture / 2
         theta = opts^.hfov*pi/180

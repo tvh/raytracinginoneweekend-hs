@@ -13,15 +13,15 @@ import Linear.Affine
 import Control.Lens
 import Control.Monad
 
-data Sphere =
+data Sphere f =
     Sphere
-    { _sphere_center :: !(Point V3 Float)
-    , _sphere_radius :: !Float
-    , _sphere_material :: !Material
+    { _sphere_center :: !(Point V3 f)
+    , _sphere_radius :: !f
+    , _sphere_material :: !(Material f)
     }
 makeLenses ''Sphere
 
-instance Hitable Sphere where
+instance (Floating f, Ord f) => Hitable f (Sphere f) where
     hit sphere ray t_min t_max =
         do let oc = ray^.ray_origin .-. sphere^.sphere_center
                a = quadrance (ray^.ray_direction)
@@ -44,7 +44,7 @@ instance Hitable Sphere where
                 , _hit_material = sphere^.sphere_material
                 }
 
-instance BoundedHitable Sphere where
+instance (Floating f, Ord f) => BoundedHitable f (Sphere f) where
     {-# INLINE boundingBox #-}
     boundingBox sphere =
         ( sphere^.sphere_center .-^ pure (sphere^.sphere_radius)

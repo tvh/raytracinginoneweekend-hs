@@ -41,6 +41,7 @@ executable rayer
                      , friday-juicypixels
                      , lens
                      , linear
+                     , mwc-random
                      , raytracinginoneweekend
                      , stm
                      , transformers

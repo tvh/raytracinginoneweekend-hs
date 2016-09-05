@@ -12,47 +12,48 @@ import Linear
 import Linear.Affine
 import Control.Lens
 import Control.Monad
+import qualified System.Random.MWC as MWC
 import qualified Data.Vector as V
 
-newtype Material =
-    Material { scatter :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray)) }
+newtype Material f =
+    Material { scatter :: Ray f -> HitRecord f -> Rayer (Maybe (V3 Float, Ray f)) }
 
-data HitRecord =
+data HitRecord f =
     HitRecord
-    { _hit_t :: !Float
-    , _hit_p :: !(Point V3 Float)
-    , _hit_normal :: !(V3 Float)
-    , _hit_material :: !Material
+    { _hit_t :: !f
+    , _hit_p :: !(Point V3 f)
+    , _hit_normal :: !(V3 f)
+    , _hit_material :: !(Material f)
     }
 makeLenses ''HitRecord
 
-class Hitable a where
+class Hitable f a | a -> f where
     -- | Check for a hit
     hit :: a
-        -> Ray
-        -> Float
+        -> Ray f
+        -> f
         -- ^ t_min
-        -> Float
+        -> f
         -- ^ t_max
-        -> Maybe HitRecord
+        -> Maybe (HitRecord f)
 
-data HitableItem =
+data HitableItem f =
     HitableItem
-    { hi_hitFun :: !(Ray -> Float -> Float -> Maybe HitRecord)
+    { hi_hitFun :: !(Ray f -> f -> f -> Maybe (HitRecord f))
     }
 
-instance Hitable HitableItem where
+instance Hitable f (HitableItem f) where
     hit = hi_hitFun
     {-# INLINE hit #-}
 
-newtype HitableList =
-    HitableList { unHitableList :: V.Vector HitableItem }
+newtype HitableList f =
+    HitableList { unHitableList :: V.Vector (HitableItem f) }
 
-instance Hitable HitableList where
+instance Hitable f (HitableList f) where
     hit (HitableList v) ray t_min t_max =
         V.foldl' merge Nothing v
       where
-        merge :: Maybe HitRecord -> HitableItem -> Maybe HitRecord
+        merge :: Maybe (HitRecord f) -> (HitableItem f) -> Maybe (HitRecord f)
         merge mClosest (HitableItem hitFun) =
             let closest_t =
                     case mClosest of
@@ -60,10 +61,10 @@ instance Hitable HitableList where
                       Nothing -> t_max
             in hitFun ray t_min closest_t `mplus` mClosest
 
-lambertian :: V3 Float -> Material
+lambertian :: forall f. (MWC.Variate f, Fractional f, Ord f) => V3 Float -> Material f
 lambertian albedo = Material scatterFun
   where
-    scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
+    scatterFun :: Ray f -> HitRecord f -> Rayer (Maybe (V3 Float, Ray f))
     scatterFun _r_in rec =
         do rnd <- randomInUnitSphere
            let target = rec^.hit_p + rec^.hit_normal.from _Point + rnd^.from _Point
@@ -71,15 +72,15 @@ lambertian albedo = Material scatterFun
                attenuation = albedo
            pure (Just (attenuation, scattered))
 
-reflect :: V3 Float -> V3 Float -> V3 Float
+reflect :: Num f => V3 f -> V3 f -> V3 f
 reflect v n = v - 2*dot v n*^n
 
-metal :: V3 Float -> Float -> Material
+metal :: forall f. (Fractional f, Ord f, MWC.Variate f, Floating f, Epsilon f) => V3 Float -> f -> Material f
 metal albedo fuzz' = Material scatterFun
   where
-    fuzz :: Float
+    fuzz :: f
     fuzz = if fuzz' < 1 then fuzz' else 1
-    scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
+    scatterFun :: Ray f -> HitRecord f -> Rayer (Maybe (V3 Float, Ray f))
     scatterFun r_in rec =
         do rnd <- randomInUnitSphere
            let reflected = reflect (normalize (r_in^.ray_direction)) (rec^.hit_normal)
@@ -90,7 +91,7 @@ metal albedo fuzz' = Material scatterFun
                      else Nothing
            pure res
 
-refract :: V3 Float -> V3 Float -> Float -> Maybe (V3 Float)
+refract :: (Floating f, Ord f, Epsilon f) => V3 f -> V3 f -> f -> Maybe (V3 f)
 refract v n ni_over_nt =
     let uv = normalize v
         dt = dot uv n
@@ -99,16 +100,16 @@ refract v n ni_over_nt =
        then Just (ni_over_nt*^(uv - n^*dt) - n^*sqrt discriminant)
        else Nothing
 
-schlick :: Float -> Float -> Float
+schlick :: Floating f => f -> f -> f
 schlick cosine ref_idx =
     let r0' = (1-ref_idx) / (1+ref_idx)
         r0 = r0' * r0'
     in r0 + (1-r0)*(1-cosine)**5
 
-dielectric :: Float -> Material
+dielectric :: forall f. (Epsilon f, MWC.Variate f, Floating f, Ord f) => f -> Material f
 dielectric ref_idx = Material scatterFun
   where
-    scatterFun :: Ray -> HitRecord -> Rayer (Maybe (V3 Float, Ray))
+    scatterFun :: Ray f -> HitRecord f -> Rayer (Maybe (V3 Float, Ray f))
     scatterFun r_in rec =
         do let attenuation :: V3 Float = 1
                cosine' = dot (r_in^.ray_direction) (rec^.hit_normal) / sqrt (quadrance (r_in^.ray_direction))
@@ -120,7 +121,7 @@ dielectric ref_idx = Material scatterFun
            case refract (r_in^.ray_direction) outward_normal ni_over_nt of
              Just refracted ->
                  do let reflect_prob = schlick cosine ref_idx
-                    rnd <- drand48
+                    rnd <- uniform
                     if rnd < reflect_prob
                       then pure $ Just (attenuation, Ray (rec^.hit_p) reflected)
                       else pure $ Just $ (attenuation, Ray (rec^.hit_p) refracted)
