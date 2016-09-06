@@ -17,3 +17,6 @@ flags:
   mersenne-random:
     use_sse2: true
 extra-package-dbs: []
+nix:
+  shell-file: shell.nix
+  packages: []
