@@ -22,6 +22,8 @@ data Sphere f =
 makeLenses ''Sphere
 
 instance (Floating f, Ord f) => Hitable f (Sphere f) where
+    {-# SPECIALISE hit :: Sphere Float -> Ray Float -> Float -> Float -> Maybe (HitRecord Float) #-}
+    {-# SPECIALISE hit :: Sphere Double -> Ray Double -> Double -> Double -> Maybe (HitRecord Double) #-}
     hit sphere ray t_min t_max =
         do let oc = ray^.ray_origin .-. sphere^.sphere_center
                a = quadrance (ray^.ray_direction)

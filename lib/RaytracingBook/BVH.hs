@@ -60,6 +60,8 @@ data BoundingBox f
     | EmptyBoundingBox
 
 instance (Ord f, Fractional f) => Hitable f (BoundingBox f) where
+    {-# SPECIALISE hit :: BoundingBox Float -> Ray Float -> Float -> Float -> Maybe (HitRecord Float) #-}
+    {-# SPECIALISE hit :: BoundingBox Double -> Ray Double -> Double -> Double -> Maybe (HitRecord Double) #-}
     hit EmptyBoundingBox _ _ _ = Nothing
     hit (BoundedNode n) ray t_min t_max = hit n ray t_min t_max
     hit (BoundingBox l h bb1 bb2) ray t_min t_max = do
@@ -87,6 +89,7 @@ instance (Ord f, Fractional f) => Hitable f (BoundingBox f) where
               Nothing -> (t_max, Nothing)
 
 instance (Fractional f, Ord f) => BoundedHitable f (BoundingBox f) where
+    {-# INLINE boundingBox #-}
     boundingBox (BoundingBox l h _ _) = (l,h)
     boundingBox (BoundedNode n) = boundingBox n
     boundingBox EmptyBoundingBox = (0,0)
