@@ -124,7 +124,13 @@ bvh_benchmarks =
                , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
                )
     , env (getRandomSpheres 1000000) $ \scene ->
-        bench "hit BVH 1000000" $
+        bench "hit BVH 1000000 (Float)" $
+          whnf (\(item, ray) -> hit item ray 0 10000)
+               ( initializeBVH scene :: BoundingBox Float
+               , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
+               )
+    , env (getRandomSpheres 1000000) $ \scene ->
+        bench "hit BVH 1000000 (Double)" $
           whnf (\(item, ray) -> hit item ray 0 10000)
                ( initializeBVH scene :: BoundingBox Double
                , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
