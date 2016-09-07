@@ -7,6 +7,7 @@ module RaytracingBook.BVH where
 import RaytracingBook.Hitable
 import RaytracingBook.Ray
 
+import Control.DeepSeq
 import Control.Lens
 import Control.Monad
 import Control.Monad.ST
@@ -32,6 +33,8 @@ data BoundedHitableItem f =
     , bhi_boundingBox :: !(Point V3 f, Point V3 f)
     , bhi_centroid :: !(Point V3 f)
     }
+instance NFData (BoundedHitableItem f) where
+    rnf x = x `seq` ()
 
 instance Hitable f (BoundedHitableItem f) where
     hit = bhi_hitFun

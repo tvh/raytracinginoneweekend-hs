@@ -13,6 +13,7 @@ library
   hs-source-dirs:      lib
   ghc-options:         -O2 -Wall
   build-depends:       base
+                     , deepseq
                      , lens
                      , linear
                      , mwc-random
@@ -49,14 +50,18 @@ executable rayer
                      , vector
   default-language:    Haskell2010
 
-executable prng-bench
+executable rayer-benchmarks
   hs-source-dirs:      src
   main-is:             Benchmarks.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
   build-depends:       base
                      , Xorshift128Plus
                      , criterion
+                     , lens
+                     , linear
                      , mersenne-random
                      , mersenne-random-pure64
                      , mwc-random
+                     , raytracinginoneweekend
+                     , vector
   default-language:    Haskell2010

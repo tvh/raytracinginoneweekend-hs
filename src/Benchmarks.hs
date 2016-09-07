@@ -1,14 +1,24 @@
 {-# LANGUAGE BangPatterns #-}
 module Main where
 
+import RaytracingBook.BVH
+import RaytracingBook.Ray
+import RaytracingBook.Sphere
+import RaytracingBook.Monad
+import RaytracingBook.Hitable
+
 import qualified System.Random.MWC as MWC
 import qualified System.Random.MWC.Distributions as MWC
 import qualified System.Random.Mersenne as MR
 import qualified System.Random.Mersenne.Pure64 as MRP
+import qualified Data.Vector as V
+import Control.Monad
 import System.IO.Unsafe
 import Data.Word
 import Data.Int
 import Data.Bits
+import Linear
+import Linear.Affine
 import qualified System.Random.Xorshift128Plus as XOS
 
 import Criterion.Main
@@ -48,9 +58,20 @@ xorShift64 !x1 =
         !x4 = x3 `xor` shiftL x3 17
     in x4
 
-main :: IO ()
-main =
-    defaultMain
+getRandomSpheres :: (Epsilon f, Floating f, MWC.Variate f, Ord f) => Int -> IO (V.Vector (BoundedHitableItem f))
+getRandomSpheres n =
+    runRayer $ V.replicateM n $ do
+        center <- P . (* (100 * (fromIntegral n ** (1/3)))) <$> randomInUnitSphere
+        radius <- standard
+        pure $ getBoundedHitableItem $
+            Sphere
+            { _sphere_center = center
+            , _sphere_radius = radius
+            , _sphere_material = dielectric 1
+            }
+
+prng_benchmarks :: [Benchmark]
+prng_benchmarks =
     [ bench "MWC.uniform (Word32)" $ nfIO (MWC.uniform genMWC :: IO Word32)
     , bench "MWC.uniform (Word64)" $ nfIO (MWC.uniform genMWC :: IO Word64)
     , bench "MWC.uniform (Float)" $ nfIO (MWC.uniform genMWC :: IO Float)
@@ -68,4 +89,61 @@ main =
     , bench "xorShift32Float" $ nf xorShift32Float 314159265
     , bench "xorShift64" $ nf xorShift64 88172645463325252
     , bench "xorShift128+" $ nf (fst. XOS.next) (XOS.initialize 123456)
+    ]
+
+bvh_benchmarks :: [Benchmark]
+bvh_benchmarks =
+    [ env (getRandomSpheres 1000) $ \scene ->
+        bench "initializeBVH (Float, 1000)" $
+          whnf initializeBVH (scene :: V.Vector (BoundedHitableItem Float))
+    , env (getRandomSpheres 1000) $ \scene ->
+        bench "initializeBVH (Double, 1000)" $
+          whnf initializeBVH (scene :: V.Vector (BoundedHitableItem Double))
+    , env (getRandomSpheres 10000) $ \scene ->
+        bench "initializeBVH (Float, 10000)" $
+          whnf initializeBVH (scene :: V.Vector (BoundedHitableItem Float))
+    , env (getRandomSpheres 10000) $ \scene ->
+        bench "initializeBVH (Double, 10000)" $
+          whnf initializeBVH (scene :: V.Vector (BoundedHitableItem Double))
+    , env (getRandomSpheres 1000) $ \scene ->
+        bench "hit BVH 1000" $
+          whnf (\(item, ray) -> hit item ray 0 10000)
+               ( initializeBVH scene :: BoundingBox Double
+               , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
+               )
+    , env (getRandomSpheres 10000) $ \scene ->
+        bench "hit BVH 10000" $
+          whnf (\(item, ray) -> hit item ray 0 10000)
+               ( initializeBVH scene :: BoundingBox Double
+               , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
+               )
+    , env (getRandomSpheres 100000) $ \scene ->
+        bench "hit BVH 100000" $
+          whnf (\(item, ray) -> hit item ray 0 10000)
+               ( initializeBVH scene :: BoundingBox Double
+               , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
+               )
+    , env (getRandomSpheres 1000000) $ \scene ->
+        bench "hit BVH 1000000" $
+          whnf (\(item, ray) -> hit item ray 0 10000)
+               ( initializeBVH scene :: BoundingBox Double
+               , Ray (P (V3 1000 0 0)) (V3 (-1) 0 0 )
+               )
+    , bench "Sphere (hit)" $
+        whnf (\(item, ray) -> hit item ray 0 1000)
+             ( Sphere 0 1 (dielectric 1 :: Material Double)
+             , Ray (P (V3 2 0 0)) (V3 (-1) 0 0 )
+             )
+    , bench "Sphere (miss)" $
+        whnf (\(item, ray) -> hit item ray 0 1000)
+             ( Sphere 0 1 (dielectric 1 :: Material Double)
+             , Ray (P (V3 2 0 0)) (V3 0 1 0 )
+             )
+    ]
+
+main :: IO ()
+main =
+    defaultMain
+    [ bgroup "prng" prng_benchmarks
+    , bgroup "bvh" bvh_benchmarks
     ]
