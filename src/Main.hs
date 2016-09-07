@@ -30,7 +30,9 @@ import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 import qualified System.Random.MWC as MWC
 
-color :: (Floating f, Hitable f h, Epsilon f, Real f) => Ray f -> h -> Word -> Rayer (V3 Float)
+{-# SPECIALISE color :: Ray Float -> BoundingBox Float -> Word -> Rayer (V3 Float) #-}
+{-# SPECIALISE color :: Ray Double -> BoundingBox Double -> Word -> Rayer (V3 Float) #-}
+color :: (Floating f, Epsilon f, Real f) => Ray f -> BoundingBox f -> Word -> Rayer (V3 Float)
 color ray world depth =
     case hit world ray (0.0001) 10000 of
       Just rec
@@ -89,7 +91,10 @@ randomWorld n = do
     marbles <- V.replicateM n randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
 
-computeImage :: forall f. (Floating f, Ord f, MWC.Variate f, Epsilon f, VSM.Storable f, Real f) => Proxy f -> Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF)
+{-# SPECIALISE computeImage :: Proxy Float -> Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF) #-}
+{-# SPECIALISE computeImage :: Proxy Double -> Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF) #-}
+computeImage :: forall f. (Floating f, Ord f, MWC.Variate f, Epsilon f, VSM.Storable f, Real f) =>
+    Proxy f -> Int -> Int -> Int -> Task (JP.Image JP.PixelRGBF)
 computeImage _ nx ny ns = do
     let camOpts =
             defaultCameraOpts

@@ -96,6 +96,8 @@ instance (Fractional f, Ord f) => BoundedHitable f (BoundingBox f) where
 
 data SplitDirection = X | Y | Z
 
+{-# SPECIALISE initializeBVH :: V.Vector (BoundedHitableItem Float) -> BoundingBox Float #-}
+{-# SPECIALISE initializeBVH :: V.Vector (BoundedHitableItem Double) -> BoundingBox Double #-}
 initializeBVH :: forall f. (Fractional f, Ord f) => V.Vector (BoundedHitableItem f) -> BoundingBox f
 initializeBVH = go X
   where
