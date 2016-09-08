@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TemplateHaskell #-}
 module RaytracingBook.Sphere where
 
@@ -22,17 +22,17 @@ data Sphere f =
 makeLenses ''Sphere
 
 instance (Floating f, Ord f) => Hitable f (Sphere f) where
-    {-# SPECIALISE hit :: Sphere Float -> Ray Float -> Float -> Float -> Maybe (HitRecord Float) #-}
-    {-# SPECIALISE hit :: Sphere Double -> Ray Double -> Double -> Double -> Maybe (HitRecord Double) #-}
+    {-# SPECIALISE instance Hitable Float (Sphere Float) #-}
+    {-# SPECIALISE instance Hitable Double (Sphere Double) #-}
     hit sphere ray t_min t_max =
-        do let oc = ray^.ray_origin .-. sphere^.sphere_center
+        do let oc = sphere^.sphere_center .-. ray^.ray_origin
                a = quadrance (ray^.ray_direction)
                b = dot oc (ray^.ray_direction)
                c = quadrance oc - (sphere^.sphere_radius)*(sphere^.sphere_radius)
                discriminant = b*b - a*c
            guard (discriminant > 0)
-           let temp1 = ((-b) - sqrt (b*b-a*c)) / a
-               temp2 = ((-b) + sqrt (b*b-a*c)) / a
+           let temp1 = (b - sqrt discriminant) / a
+               temp2 = (b + sqrt discriminant) / a
            rec_t <-
                if | temp1 < t_max && temp1 > t_min -> Just temp1
                   | temp2 < t_max && temp2 > t_min -> Just temp2
