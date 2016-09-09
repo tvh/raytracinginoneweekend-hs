@@ -24,10 +24,11 @@ library
                      , vector-algorithms
   exposed-modules:     RaytracingBook.Ray
                      , RaytracingBook.BVH
-                     , RaytracingBook.Hitable
-                     , RaytracingBook.Sphere
                      , RaytracingBook.Camera
+                     , RaytracingBook.Hitable
                      , RaytracingBook.Monad
+                     , RaytracingBook.Sphere
+                     , RaytracingBook.Triangle
   default-language:    Haskell2010
 
 executable rayer
