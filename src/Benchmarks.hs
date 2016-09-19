@@ -12,7 +12,6 @@ import qualified System.Random.MWC.Distributions as MWC
 import qualified System.Random.Mersenne as MR
 import qualified System.Random.Mersenne.Pure64 as MRP
 import qualified Data.Vector as V
-import Control.Monad
 import System.IO.Unsafe
 import Data.Word
 import Data.Int
