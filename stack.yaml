@@ -13,6 +13,10 @@ packages:
     git: https://github.com/tvh/friday-devil.git
     commit: 91fad2b36b21ded72f62fbb90e32bb7af2d2e36a
   extra-dep: true
+- location:
+    git: https://github.com/tvh/wavefront.git
+    commit: 31cc777e9529041a1b72cc7343122960be692db4
+  extra-dep: true
 extra-deps:
 - async-pool-0.9.0
 - friday-juicypixels-0.1.2

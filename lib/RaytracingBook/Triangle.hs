@@ -13,6 +13,7 @@ import Linear
 import Linear.Affine
 import Control.Lens
 import Control.Monad
+import Control.Monad.Zip
 
 data Triangle f =
     Triangle
@@ -63,13 +64,13 @@ instance (Epsilon f, Floating f, Ord f) => BoundedHitable f (Triangle f) where
     {-# SPECIALISE instance BoundedHitable Double (Triangle Double) #-}
     {-# INLINABLE boundingBox #-}
     boundingBox triangle =
-        let V3 a b c = (triangle^.triangle_vertices)
+        let V3 (P a) (P b) (P c) = (triangle^.triangle_vertices)
             l1 = a
             h1 = a
-            l2 = min l1 b
-            h2 = max h1 b
-            l3 = min l2 c
-            h3 = max h2 c
-        in (l3,h3)
+            l2 = mzipWith min l1 b
+            h2 = mzipWith max h1 b
+            l3 = mzipWith min l2 c
+            h3 = mzipWith max h2 c
+        in (P l3, P h3)
     {-# INLINABLE centroid #-}
     centroid triangle = sum (triangle^.triangle_vertices) / 3

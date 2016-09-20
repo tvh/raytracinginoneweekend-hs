@@ -22,10 +22,12 @@ library
                      , transformers
                      , vector
                      , vector-algorithms
+                     , wavefront
   exposed-modules:     RaytracingBook.Ray
                      , RaytracingBook.BVH
                      , RaytracingBook.Camera
                      , RaytracingBook.Hitable
+                     , RaytracingBook.Import.Obj
                      , RaytracingBook.Monad
                      , RaytracingBook.Sphere
                      , RaytracingBook.Triangle
@@ -49,6 +51,7 @@ executable rayer
                      , stm
                      , transformers
                      , vector
+                     , wavefront
   default-language:    Haskell2010
 
 executable rayer-benchmarks
