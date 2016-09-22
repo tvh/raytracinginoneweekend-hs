@@ -164,6 +164,32 @@ getScene RandomScene = do
             & hfov .~ 30
     world <- runRayer randomWorld
     pure (world, camOpts)
+getScene TwoSpheres = do
+    let camOpts =
+            defaultCameraOpts
+            & lookfrom .~ P (V3 13 2 3)
+            & lookat .~ P (V3 0 0 0)
+            & focusDist .~ 10
+            & aperture .~ 0.0
+            & hfov .~ 30
+    let t1 = ConstantTexture (V3 0.2 0.3 0.1)
+        t2 = ConstantTexture (V3 0.9 0.9 0.9)
+        texture = (CheckerTexture t1 t2)
+        spheres =
+            V.fromList
+            [ Sphere
+              { _sphere_center = P (V3 0 (-10) 0)
+              , _sphere_radius = 10
+              , _sphere_material = lambertian texture
+              }
+            , Sphere
+              { _sphere_center = P (V3 0 10 0)
+              , _sphere_radius = 10
+              , _sphere_material = lambertian texture
+              }
+            ]
+        world = initializeBVH $ V.map getBoundedHitableItem spheres
+    pure (world, camOpts)
 getScene (ObjFile objFile) = do
     let camOpts =
             defaultCameraOpts
@@ -180,6 +206,7 @@ getScene (ObjFile objFile) = do
 
 data Scene
     = RandomScene
+    | TwoSpheres
     | ObjFile FilePath
 
 data RenderingOpts =
@@ -222,6 +249,9 @@ parseOpts =
     sceneParser =
         flag' RandomScene
         ( long "random-scene" )
+        <|>
+        flag' TwoSpheres
+        ( long "two-spheres" )
         <|>
         option (ObjFile <$> str)
         ( long "obj-file" )
