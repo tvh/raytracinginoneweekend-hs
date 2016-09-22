@@ -116,26 +116,14 @@ randomWorld = do
     marbles <- V.replicateM 441 randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ spheres <> marbles
 
-{-# SPECIALISE computeImage :: Proxy Float -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
-{-# SPECIALISE computeImage :: Proxy Double -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
+{-# SPECIALISE computeImage :: Proxy Float -> Int -> Int -> Int -> Scene -> Task (JP.Image JP.PixelRGBF) #-}
+{-# SPECIALISE computeImage :: Proxy Double -> Int -> Int -> Int -> Scene -> Task (JP.Image JP.PixelRGBF) #-}
 computeImage :: forall f. (IEEE f, MWC.Variate f, Epsilon f, VSM.Storable f) =>
-    Proxy f -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF)
-computeImage _ nx ny ns mObj = do
-    let camOpts =
-            defaultCameraOpts
-            & lookfrom .~ P (V3 13 2 3)
-            & lookat .~ P (V3 0 0 0)
-            & focusDist .~ 10
-            & aperture .~ 0.1
-            & aspect .~ fromIntegral nx / fromIntegral ny
-            & hfov .~ 30
-        cam = getCamera camOpts
+    Proxy f -> Int -> Int -> Int -> Scene -> Task (JP.Image JP.PixelRGBF)
+computeImage _ nx ny ns scene = do
     liftIO $ putStrLn "Generating World"
-    world <- case mObj of
-      Nothing -> liftIO $ runRayer randomWorld :: Task (BoundingBox f)
-      Just obj -> do
-          let triangles = fromWavefrontOBJ obj (lambertian (ConstantTexture (V3 0.5 0.5 0.5)))
-          pure $! initializeBVH $ V.map getBoundedHitableItem $ triangles
+    (world, camOpts :: CameraOpts f) <- liftIO $ getScene scene
+    let cam = getCamera (camOpts & aspect .~ fromIntegral nx / fromIntegral ny)
     let chunk_length = max 64 ((262144+ns-1) `div` ns)
         chunks = (nx*ny+chunk_length-1) `div` chunk_length
         chunk_upper n
@@ -165,12 +153,41 @@ computeImage _ nx ny ns mObj = do
     liftIO $ putStrLn "Done"
     return $! JP.Image nx ny pixelData'
 
+getScene :: (Floating f, Ord f, Epsilon f, MWC.Variate f) => Scene -> IO (BoundingBox f, CameraOpts f)
+getScene RandomScene = do
+    let camOpts =
+            defaultCameraOpts
+            & lookfrom .~ P (V3 13 2 3)
+            & lookat .~ P (V3 0 0 0)
+            & focusDist .~ 10
+            & aperture .~ 0.1
+            & hfov .~ 30
+    world <- runRayer randomWorld
+    pure (world, camOpts)
+getScene (ObjFile objFile) = do
+    let camOpts =
+            defaultCameraOpts
+            & lookfrom .~ P (V3 100 100 100)
+            & lookat .~ P (V3 0 0 0)
+            & focusDist .~ sqrt (3*100**2)
+            & aperture .~ 0.01
+            & hfov .~ 80
+    mObj <- WF.fromFile objFile
+    obj <- either fail return mObj
+    let triangles = fromWavefrontOBJ obj (lambertian (ConstantTexture (V3 0.5 0.5 0.5)))
+    let world = initializeBVH $ V.map getBoundedHitableItem $ triangles
+    pure (world, camOpts)
+
+data Scene
+    = RandomScene
+    | ObjFile FilePath
+
 data RenderingOpts =
     RenderingOpts
     { opts_width :: Int
     , opts_height :: Int
     , opts_samples :: Int
-    , opts_input :: Maybe FilePath
+    , opts_scene :: Scene
     , opts_output :: FilePath
     , opts_useFloat :: Bool
     }
@@ -193,11 +210,7 @@ parseOpts =
        <> metavar "SAMPLES"
        <> help "Number of samples per pixel"
        <> value 10 )
-    <*> option (Just <$> str)
-        ( long "input"
-       <> metavar "FILEPATH"
-       <> help "Filename to read an OBJ file from"
-       <> value Nothing )
+    <*> sceneParser
     <*> strOption
         ( long "output"
        <> metavar "FILEPATH"
@@ -205,6 +218,15 @@ parseOpts =
     <*> switch
         ( long "use-float"
        <> help "Use Float for Rays" )
+  where
+    sceneParser =
+        flag' RandomScene
+        ( long "random-scene" )
+        <|>
+        option (ObjFile <$> str)
+        ( long "obj-file" )
+        <|>
+        pure RandomScene
 
 main :: IO ()
 main = do
@@ -216,15 +238,10 @@ main = do
         samples = opts_samples opts
     hSetBuffering stdout NoBuffering
     nt <- getNumCapabilities
-    mObj <- case opts_input opts of
-        Nothing -> pure Nothing
-        Just objFile -> do
-            mObj <- WF.fromFile objFile
-            either fail (return . Just) mObj
     image <- withTaskGroup nt $ \tg -> runTask tg $
         if opts_useFloat opts
-           then computeImage (Proxy :: Proxy Float) nx ny samples mObj
-           else computeImage (Proxy :: Proxy Double) nx ny samples mObj
+           then computeImage (Proxy :: Proxy Float) nx ny samples (opts_scene opts)
+           else computeImage (Proxy :: Proxy Double) nx ny samples (opts_scene opts)
     let image_corrected = JP.gammaCorrection 2 image
         image_8 = JP.convertRGB8 $ JP.ImageRGBF image_corrected
         imageFriday = FR.toFridayRGB image_8
