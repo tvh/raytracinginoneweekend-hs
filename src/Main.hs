@@ -3,13 +3,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
-import RaytracingBook.Camera
 import RaytracingBook.BVH
+import RaytracingBook.Camera
 import RaytracingBook.Hitable
 import RaytracingBook.Import.Obj
 import RaytracingBook.Monad
 import RaytracingBook.Ray
 import RaytracingBook.Sphere
+import RaytracingBook.Texture
 
 import Control.Concurrent
 import Control.Concurrent.Async.Pool
@@ -20,6 +21,7 @@ import Data.Proxy
 import Options.Applicative
 import Linear
 import Linear.Affine
+import Numeric.IEEE
 import System.IO
 import Unsafe.Coerce
 import qualified Codec.Picture as JP
@@ -34,11 +36,11 @@ import qualified System.Random.MWC as MWC
 
 {-# SPECIALISE color :: Ray Float -> BoundingBox Float -> Word -> Rayer (V3 Float) #-}
 {-# SPECIALISE color :: Ray Double -> BoundingBox Double -> Word -> Rayer (V3 Float) #-}
-color :: (Floating f, Epsilon f, Real f) => Ray f -> BoundingBox f -> Word -> Rayer (V3 Float)
+color :: (IEEE f, Epsilon f) => Ray f -> BoundingBox f -> Word -> Rayer (V3 Float)
 color ray world depth =
-    case hit world ray (0.0001) 10000 of
+    case hit world ray (epsilon*100) maxFinite of
       Just rec
-          | depth < 50 -> do
+          | depth < 5 -> do
               (light, mScattered) <- scatter (rec ^.hit_material) ray rec
               (light +) <$> case mScattered of
                 Just (attenuation, scattered) ->
@@ -62,7 +64,7 @@ randomMaterial = do
     rnd <- uniform :: Rayer Float
     if | rnd < 0.4 -> do
            col <- randomColor
-           pure $ lambertian col
+           pure $ lambertian (ConstantTexture col)
        | rnd < 0.8 -> do
            col <- randomColor
            fuzz <- uniform
@@ -84,24 +86,27 @@ randomSphere = do
 
 randomWorld :: (Floating f, Ord f, MWC.Variate f, Epsilon f) => Int -> Rayer (BoundingBox f)
 randomWorld n = do
-    let ground =
+    let t1 = ConstantTexture (V3 0.2 0.3 0.1)
+        t2 = ConstantTexture (V3 0.9 0.9 0.9)
+        texture = (CheckerTexture t1 t2)
+        ground =
             Sphere
-            { _sphere_center = P (V3 0 (-10000) (-1))
-            , _sphere_radius = 10000
-            , _sphere_material = lambertian (V3 0.8 0.8 0.0)
+            { _sphere_center = P (V3 0 (-1000) 0)
+            , _sphere_radius = 1000
+            , _sphere_material = lambertian texture
             }
     marbles <- V.replicateM n randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
 
 {-# SPECIALISE computeImage :: Proxy Float -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
 {-# SPECIALISE computeImage :: Proxy Double -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
-computeImage :: forall f. (Floating f, MWC.Variate f, Epsilon f, VSM.Storable f, Real f) =>
+computeImage :: forall f. (IEEE f, MWC.Variate f, Epsilon f, VSM.Storable f) =>
     Proxy f -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF)
 computeImage _ nx ny ns mObj = do
     let camOpts =
             defaultCameraOpts
-            & lookfrom .~ P (V3 40 40 40)
-            & lookat .~ P (V3 0 10 0)
+            & lookfrom .~ P (V3 20 20 20)
+            & lookat .~ P (V3 0 0 0)
             & focusDist .~ sqrt (quadrance (V3 10 4 10 - V3 2 0 2))
             & aperture .~ 0.00
             & aspect .~ fromIntegral nx / fromIntegral ny
@@ -111,7 +116,7 @@ computeImage _ nx ny ns mObj = do
     world <- case mObj of
       Nothing -> liftIO $ runRayer (randomWorld 100) :: Task (BoundingBox f)
       Just obj -> do
-          let triangles = fromWavefrontOBJ obj (lambertian (V3 0.5 0.5 0.5))
+          let triangles = fromWavefrontOBJ obj (lambertian (ConstantTexture (V3 0.5 0.5 0.5)))
           pure $! initializeBVH $ V.map getBoundedHitableItem $ triangles
     let chunk_length = max 64 ((262144+ns-1) `div` ns)
         chunks = (nx*ny+chunk_length-1) `div` chunk_length

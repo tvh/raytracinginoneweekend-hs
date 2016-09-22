@@ -30,6 +30,7 @@ library
                      , RaytracingBook.Import.Obj
                      , RaytracingBook.Monad
                      , RaytracingBook.Sphere
+                     , RaytracingBook.Texture
                      , RaytracingBook.Triangle
   default-language:    Haskell2010
 
@@ -43,6 +44,7 @@ executable rayer
                      , friday
                      , friday-devil
                      , friday-juicypixels
+                     , ieee754
                      , lens
                      , linear
                      , mwc-random

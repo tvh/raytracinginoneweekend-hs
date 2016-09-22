@@ -7,6 +7,7 @@ module RaytracingBook.Hitable where
 
 import RaytracingBook.Ray
 import RaytracingBook.Monad
+import RaytracingBook.Texture
 
 import Linear
 import Linear.Affine
@@ -61,12 +62,12 @@ instance Hitable f (HitableList f) where
                       Nothing -> t_max
             in hitFun ray t_min closest_t `mplus` mClosest
 
-normalColor :: Real f => Material f
+normalColor :: (Floating f, Real f, Epsilon f) => Material f
 normalColor = Material scatterFun
   where
-    scatterFun _r_in rec = pure (fmap realToFrac (rec^.hit_normal),Nothing)
+    scatterFun _r_in rec = pure (fmap (realToFrac . (/2) . (+1)) (normalize $ rec^.hit_normal),Nothing)
 
-lambertian :: forall f. (MWC.Variate f, Fractional f, Ord f) => V3 Float -> Material f
+lambertian :: forall f a. (MWC.Variate f, Fractional f, Ord f, Texture f a) => a -> Material f
 lambertian albedo = Material scatterFun
   where
     scatterFun :: Ray f -> HitRecord f -> Rayer (V3 Float, Maybe (V3 Float, Ray f))
@@ -74,7 +75,7 @@ lambertian albedo = Material scatterFun
         do rnd <- randomInUnitSphere
            let target = rec^.hit_p + rec^.hit_normal.from _Point + rnd^.from _Point
                scattered = Ray (rec^.hit_p) (target .-. rec^.hit_p)
-               attenuation = albedo
+               attenuation = textureValue albedo 0 0 (rec^.hit_p)
            pure (0, Just (attenuation, scattered))
 
 reflect :: Num f => V3 f -> V3 f -> V3 f
