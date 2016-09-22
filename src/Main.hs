@@ -54,7 +54,7 @@ color ray world depth =
 
 randomCoordinate :: (MWC.Variate f, Num f) => f -> Rayer (Point V3 f)
 randomCoordinate radius =
-    P <$> (V3 <$> uniformR (-10,10) <*> pure radius <*> uniformR (-10,10))
+    P <$> (V3 <$> uniformR (-11,11) <*> pure radius <*> uniformR (-11,11))
 
 randomColor :: MWC.Variate f => Rayer (V3 f)
 randomColor = V3 <$> uniform <*> uniform <*> uniform
@@ -62,20 +62,19 @@ randomColor = V3 <$> uniform <*> uniform <*> uniform
 randomMaterial :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Material f)
 randomMaterial = do
     rnd <- uniform :: Rayer Float
-    if | rnd < 0.4 -> do
+    if | rnd < 0.8 -> do
            col <- randomColor
            pure $ lambertian (ConstantTexture col)
-       | rnd < 0.8 -> do
-           col <- randomColor
-           fuzz <- uniform
+       | rnd < 0.95 -> do
+           col <- (0.5*) . (+1) <$> randomColor
+           fuzz <- (0.5*) <$> uniform
            pure $ metal col fuzz
        | otherwise -> do
-           nt <- uniformR (1.3,2)
-           pure $ dielectric nt
+           pure $ dielectric 1.5
 
 randomSphere :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Sphere f)
 randomSphere = do
-    rad <- uniformR (0.2,0.6)
+    let rad = 0.2
     coord <- randomCoordinate rad
     mat <- randomMaterial
     pure Sphere
@@ -84,8 +83,8 @@ randomSphere = do
          , _sphere_material = mat
          }
 
-randomWorld :: (Floating f, Ord f, MWC.Variate f, Epsilon f) => Int -> Rayer (BoundingBox f)
-randomWorld n = do
+randomWorld :: (Floating f, Ord f, MWC.Variate f, Epsilon f) => Rayer (BoundingBox f)
+randomWorld = do
     let t1 = ConstantTexture (V3 0.2 0.3 0.1)
         t2 = ConstantTexture (V3 0.9 0.9 0.9)
         texture = (CheckerTexture t1 t2)
@@ -95,8 +94,27 @@ randomWorld n = do
             , _sphere_radius = 1000
             , _sphere_material = lambertian texture
             }
-    marbles <- V.replicateM n randomSphere
-    pure $! initializeBVH $ V.map getBoundedHitableItem $ ground `V.cons` marbles
+        sphere1 =
+            Sphere
+            { _sphere_center = P (V3 0 1 0)
+            , _sphere_radius = 1
+            , _sphere_material = dielectric 1.5
+            }
+        sphere2 =
+            Sphere
+            { _sphere_center = P (V3 (-4) 1 0)
+            , _sphere_radius = 1
+            , _sphere_material = lambertian (ConstantTexture (V3 0.4 0.2 0.1))
+            }
+        sphere3 =
+            Sphere
+            { _sphere_center = P (V3 4 1 0)
+            , _sphere_radius = 1
+            , _sphere_material = metal (V3 0.7 0.6 0.5) 0
+            }
+        spheres = V.fromList [ground, sphere1, sphere2, sphere3]
+    marbles <- V.replicateM 441 randomSphere
+    pure $! initializeBVH $ V.map getBoundedHitableItem $ spheres <> marbles
 
 {-# SPECIALISE computeImage :: Proxy Float -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
 {-# SPECIALISE computeImage :: Proxy Double -> Int -> Int -> Int -> Maybe WF.WavefrontOBJ -> Task (JP.Image JP.PixelRGBF) #-}
@@ -105,16 +123,16 @@ computeImage :: forall f. (IEEE f, MWC.Variate f, Epsilon f, VSM.Storable f) =>
 computeImage _ nx ny ns mObj = do
     let camOpts =
             defaultCameraOpts
-            & lookfrom .~ P (V3 20 20 20)
+            & lookfrom .~ P (V3 13 2 3)
             & lookat .~ P (V3 0 0 0)
-            & focusDist .~ sqrt (quadrance (V3 10 4 10 - V3 2 0 2))
-            & aperture .~ 0.00
+            & focusDist .~ 10
+            & aperture .~ 0.1
             & aspect .~ fromIntegral nx / fromIntegral ny
-            & hfov .~ 80
+            & hfov .~ 30
         cam = getCamera camOpts
     liftIO $ putStrLn "Generating World"
     world <- case mObj of
-      Nothing -> liftIO $ runRayer (randomWorld 100) :: Task (BoundingBox f)
+      Nothing -> liftIO $ runRayer randomWorld :: Task (BoundingBox f)
       Just obj -> do
           let triangles = fromWavefrontOBJ obj (lambertian (ConstantTexture (V3 0.5 0.5 0.5)))
           pure $! initializeBVH $ V.map getBoundedHitableItem $ triangles
