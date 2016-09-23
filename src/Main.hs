@@ -59,7 +59,7 @@ randomCoordinate radius =
 randomColor :: MWC.Variate f => Rayer (V3 f)
 randomColor = V3 <$> uniform <*> uniform <*> uniform
 
-randomMaterial :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Material f)
+randomMaterial :: (MWC.Variate f, RealFloat f, Epsilon f) => Rayer (Material f)
 randomMaterial = do
     rnd <- uniform :: Rayer Float
     if | rnd < 0.8 -> do
@@ -72,7 +72,7 @@ randomMaterial = do
        | otherwise -> do
            pure $ dielectric 1.5
 
-randomSphere :: (MWC.Variate f, Floating f, Ord f, Epsilon f) => Rayer (Sphere f)
+randomSphere :: (MWC.Variate f, RealFloat f, Epsilon f) => Rayer (Sphere f)
 randomSphere = do
     let rad = 0.2
     coord <- randomCoordinate rad
@@ -83,7 +83,7 @@ randomSphere = do
          , _sphere_material = mat
          }
 
-randomWorld :: (Floating f, Ord f, MWC.Variate f, Epsilon f) => Rayer (BoundingBox f)
+randomWorld :: (RealFloat f, MWC.Variate f, Epsilon f) => Rayer (BoundingBox f)
 randomWorld = do
     let t1 = ConstantTexture (V3 0.2 0.3 0.1)
         t2 = ConstantTexture (V3 0.9 0.9 0.9)
@@ -153,7 +153,7 @@ computeImage _ nx ny ns scene = do
     liftIO $ putStrLn "Done"
     return $! JP.Image nx ny pixelData'
 
-getScene :: (Floating f, Ord f, Epsilon f, MWC.Variate f) => Scene -> IO (BoundingBox f, CameraOpts f)
+getScene :: (RealFloat f, Epsilon f, MWC.Variate f) => Scene -> IO (BoundingBox f, CameraOpts f)
 getScene RandomScene = do
     let camOpts =
             defaultCameraOpts

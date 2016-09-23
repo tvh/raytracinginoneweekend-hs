@@ -23,6 +23,7 @@ data HitRecord f =
     HitRecord
     { _hit_t :: !f
     , _hit_p :: !(Point V3 f)
+    , _hit_uv :: !(V2 f)
     , _hit_normal :: !(V3 f)
     , _hit_material :: !(Material f)
     }

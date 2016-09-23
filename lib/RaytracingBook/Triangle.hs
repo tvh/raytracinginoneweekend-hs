@@ -52,9 +52,11 @@ instance (Floating f, Ord f, Epsilon f) => Hitable f (Triangle f) where
            let w = 1 - u - v
                p = u*^vert0 + v*^vert1 + w*^vert2
                n = normalize (cross edge1 edge2)
+               uv = V2 0 1 ^* v + V2 1 1 ^* w
            Just HitRecord
                 { _hit_t = t
                 , _hit_p = p
+                , _hit_uv = uv
                 , _hit_normal = n
                 , _hit_material = triangle^.triangle_material
                 }

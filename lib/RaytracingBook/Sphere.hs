@@ -22,7 +22,7 @@ data Sphere f =
     }
 makeLenses ''Sphere
 
-instance (Floating f, Ord f) => Hitable f (Sphere f) where
+instance (RealFloat f, Ord f) => Hitable f (Sphere f) where
     {-# SPECIALISE instance Hitable Float (Sphere Float) #-}
     {-# SPECIALISE instance Hitable Double (Sphere Double) #-}
     hit sphere ray t_min t_max =
@@ -40,14 +40,20 @@ instance (Floating f, Ord f) => Hitable f (Sphere f) where
                   | otherwise -> Nothing
            let rec_p = pointAtParameter ray rec_t
                rec_normal = (rec_p .-. sphere^.sphere_center) ^/ sphere^.sphere_radius
+               rec_p_normalized = (rec_p - sphere^.sphere_center) ^/ sphere^.sphere_radius
+               phi = atan2 (rec_p_normalized^._z) (rec_p_normalized^._x)
+               theta = asin (rec_p_normalized^._y)
+               u = 1-(phi+pi) / (2*pi)
+               v = (theta + pi/2) / pi
            Just HitRecord
                 { _hit_t = rec_t
                 , _hit_p = rec_p
+                , _hit_uv = V2 u v
                 , _hit_normal = rec_normal
                 , _hit_material = sphere^.sphere_material
                 }
 
-instance (Floating f, Ord f) => BoundedHitable f (Sphere f) where
+instance (RealFloat f, Ord f) => BoundedHitable f (Sphere f) where
     {-# INLINE boundingBox #-}
     boundingBox sphere =
         ( sphere^.sphere_center .-^ pure (sphere^.sphere_radius)

@@ -57,7 +57,7 @@ xorShift64 !x1 =
         !x4 = x3 `xor` shiftL x3 17
     in x4
 
-getRandomSpheres :: (Epsilon f, Floating f, MWC.Variate f, Ord f) => Int -> IO (V.Vector (BoundedHitableItem f))
+getRandomSpheres :: (Epsilon f, RealFloat f, MWC.Variate f) => Int -> IO (V.Vector (BoundedHitableItem f))
 getRandomSpheres n =
     runRayer $ V.replicateM n $ do
         center <- P . (* (100 * (fromIntegral n ** (1/3)))) <$> randomInUnitSphere
