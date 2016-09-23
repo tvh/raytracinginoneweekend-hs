@@ -14,6 +14,7 @@ library
   ghc-options:         -O2 -Wall
   build-depends:       base
                      , deepseq
+                     , JuicyPixels
                      , lens
                      , linear
                      , mwc-random

@@ -76,7 +76,7 @@ lambertian albedo = Material scatterFun
         do rnd <- randomInUnitSphere
            let target = rec^.hit_p + rec^.hit_normal.from _Point + rnd^.from _Point
                scattered = Ray (rec^.hit_p) (target .-. rec^.hit_p)
-               attenuation = textureValue albedo 0 0 (rec^.hit_p)
+               attenuation = textureValue albedo (rec^.hit_uv) (rec^.hit_p)
            pure (0, Just (attenuation, scattered))
 
 reflect :: Num f => V3 f -> V3 f -> V3 f

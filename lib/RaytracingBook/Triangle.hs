@@ -8,7 +8,6 @@ import RaytracingBook.Hitable
 import RaytracingBook.BVH
 import RaytracingBook.Ray
 
-import qualified Data.Vector as V
 import Linear
 import Linear.Affine
 import Control.Lens

@@ -190,6 +190,26 @@ getScene TwoSpheres = do
             ]
         world = initializeBVH $ V.map getBoundedHitableItem spheres
     pure (world, camOpts)
+getScene Earth = do
+    let camOpts =
+            defaultCameraOpts
+            & lookfrom .~ P (V3 13 2 3)
+            & lookat .~ P (V3 0 0 0)
+            & focusDist .~ 10
+            & aperture .~ 0.0
+            & hfov .~ 30
+    Right image <- JP.readJpeg "data/earth.jpg"
+    let texture = ImageTexture $ JP.promoteImage $ JP.convertRGB8 image
+        spheres =
+            V.fromList
+            [ Sphere
+              { _sphere_center = P (V3 0 0 0)
+              , _sphere_radius = 2
+              , _sphere_material = lambertian texture
+              }
+            ]
+        world = initializeBVH $ V.map getBoundedHitableItem spheres
+    pure (world, camOpts)
 getScene (ObjFile objFile) = do
     let camOpts =
             defaultCameraOpts
@@ -207,6 +227,7 @@ getScene (ObjFile objFile) = do
 data Scene
     = RandomScene
     | TwoSpheres
+    | Earth
     | ObjFile FilePath
 
 data RenderingOpts =
@@ -252,6 +273,9 @@ parseOpts =
         <|>
         flag' TwoSpheres
         ( long "two-spheres" )
+        <|>
+        flag' Earth
+        ( long "earth" )
         <|>
         option (ObjFile <$> str)
         ( long "obj-file" )
