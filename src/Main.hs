@@ -11,6 +11,7 @@ import RaytracingBook.Monad
 import RaytracingBook.Ray
 import RaytracingBook.Sphere
 import RaytracingBook.Texture
+import RaytracingBook.Triangle
 
 import Control.Concurrent
 import Control.Concurrent.Async.Pool
@@ -226,11 +227,62 @@ getScene (ObjFile objFile) = do
     let triangles = fromWavefrontOBJ obj (lambertian (ConstantTexture (V3 0.5 0.5 0.5)))
     let world = initializeBVH $ V.map getBoundedHitableItem $ triangles
     pure (world, camOpts)
+getScene Cornell = do
+    let camOpts =
+            defaultCameraOpts
+            & lookfrom .~ P (V3 278 278 (-800))
+            & lookat .~ P (V3 278 278 0)
+            & focusDist .~ 10
+            & aperture .~ 0.0
+            & hfov .~ 60
+        red = lambertian (ConstantTexture (V3 0.65 0.05 0.05))
+        white = lambertian (ConstantTexture (V3 0.73 0.73 0.73))
+        green = lambertian (ConstantTexture (V3 0.12 0.45 0.15))
+        light = diffuseLight (ConstantTexture (V3 7 7 7))
+        faces =
+            polygon (V.fromList [  P $ V3 113 554 127
+                                ,  P $ V3 443 554 127
+                                ,  P $ V3 443 554 432
+                                ,  P $ V3 113 554 432
+                                ]) light
+            <>
+            polygon (V.fromList [  P $ V3 0 0 0
+                                ,  P $ V3 0 555 0
+                                ,  P $ V3 0 555 555
+                                ,  P $ V3 0 0 555
+                                ]) red
+            <>
+            polygon (V.fromList [  P $ V3 555 0 0
+                                ,  P $ V3 555 0 555
+                                ,  P $ V3 555 555 555
+                                ,  P $ V3 555 555 0
+                                ]) green
+            <>
+            polygon (V.fromList [  P $ V3 0 0 0
+                                ,  P $ V3 0 0 555
+                                ,  P $ V3 555 0 555
+                                ,  P $ V3 555 0 0
+                                ]) white
+            <>
+            polygon (V.fromList [  P $ V3 0 555 0
+                                ,  P $ V3 555 555 0
+                                ,  P $ V3 555 555 555
+                                ,  P $ V3 0 555 555
+                                ]) white
+            <>
+            polygon (V.fromList [  P $ V3 0 0 555
+                                ,  P $ V3 0 555 555
+                                ,  P $ V3 555 555 555
+                                ,  P $ V3 555 0 555
+                                ]) white
+        world = initializeBVH $ V.map getBoundedHitableItem $ faces
+    pure (world, camOpts)
 
 data Scene
     = RandomScene
     | TwoSpheres
     | Earth
+    | Cornell
     | ObjFile FilePath
 
 data RenderingOpts =
@@ -279,6 +331,9 @@ parseOpts =
         <|>
         flag' Earth
         ( long "earth" )
+        <|>
+        flag' Cornell
+        ( long "cornell" )
         <|>
         option (ObjFile <$> str)
         ( long "obj-file" )

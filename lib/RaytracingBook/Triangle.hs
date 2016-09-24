@@ -13,6 +13,7 @@ import Linear.Affine
 import Control.Lens
 import Control.Monad
 import Control.Monad.Zip
+import qualified Data.Vector as V
 
 data Triangle f =
     Triangle
@@ -49,7 +50,7 @@ instance (Floating f, Ord f, Epsilon f) => Hitable f (Triangle f) where
            let t = dot edge2 qvec * inv_det
            guard (t>t_min && t<t_max)
            let w = 1 - u - v
-               p = u*^vert0 + v*^vert1 + w*^vert2
+               p = pointAtParameter ray t
                n = normalize (cross edge1 edge2)
                uv = V2 0 1 ^* v + V2 1 1 ^* w
            Just HitRecord
@@ -72,6 +73,12 @@ instance (Epsilon f, Floating f, Ord f) => BoundedHitable f (Triangle f) where
             h2 = mzipWith max h1 b
             l3 = mzipWith min l2 c
             h3 = mzipWith max h2 c
-        in (P l3, P h3)
+        in (P l3-0.001, P h3+0.001)
     {-# INLINABLE centroid #-}
     centroid triangle = sum (triangle^.triangle_vertices) / 3
+
+polygon :: V.Vector (Point V3 f) -> Material f -> V.Vector (Triangle f)
+polygon points mat = do
+    let v0 = V.head points
+    (v1,v2) <- V.zip (V.drop 1 points) (V.drop 2 points)
+    pure $ Triangle (V3 v0 v1 v2) mat
