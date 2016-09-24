@@ -133,3 +133,10 @@ dielectric ref_idx = Material scatterFun
                       then pure $ (0, Just (attenuation, Ray (rec^.hit_p) reflected))
                       else pure $ (0, Just $ (attenuation, Ray (rec^.hit_p) refracted))
              Nothing -> pure $ (0, Just (attenuation, Ray (rec^.hit_p) reflected))
+
+diffuseLight :: forall f a. (Texture f a) => a -> Material f
+diffuseLight emit = Material scatterFun
+  where
+    scatterFun :: Ray f -> HitRecord f -> Rayer (V3 Float, Maybe (V3 Float, Ray f))
+    scatterFun _r_in rec =
+        pure $ (textureValue emit (rec^.hit_uv) (rec^.hit_p), Nothing)

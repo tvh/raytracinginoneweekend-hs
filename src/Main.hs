@@ -40,17 +40,14 @@ color :: (IEEE f, Epsilon f) => Ray f -> BoundingBox f -> Word -> Rayer (V3 Floa
 color ray world depth =
     case hit world ray (epsilon*100) maxFinite of
       Just rec
-          | depth < 5 -> do
+          | depth < 50 -> do
               (light, mScattered) <- scatter (rec ^.hit_material) ray rec
               (light +) <$> case mScattered of
                 Just (attenuation, scattered) ->
                     (attenuation *) <$> color scattered world (depth+1)
                 Nothing -> pure 0
           | otherwise -> pure 0
-      Nothing -> pure $
-          let unit_direction = normalize $ fmap realToFrac $ ray^.ray_direction
-              t = 0.5 * unit_direction^._y+1
-          in (1-t)*^V3 1 1 1 + t*^V3 0.5 0.7 1.0
+      Nothing -> pure 0
 
 randomCoordinate :: (MWC.Variate f, Num f) => f -> Rayer (Point V3 f)
 randomCoordinate radius =
@@ -94,6 +91,12 @@ randomWorld = do
             , _sphere_radius = 1000
             , _sphere_material = lambertian texture
             }
+        sun =
+            Sphere
+            { _sphere_center = P (V3 (-25) 25 25)
+            , _sphere_radius = 20
+            , _sphere_material = diffuseLight (ConstantTexture (V3 5 5 5))
+            }
         sphere1 =
             Sphere
             { _sphere_center = P (V3 0 1 0)
@@ -112,7 +115,7 @@ randomWorld = do
             , _sphere_radius = 1
             , _sphere_material = metal (V3 0.7 0.6 0.5) 0
             }
-        spheres = V.fromList [ground, sphere1, sphere2, sphere3]
+        spheres = V.fromList [ground, sun, sphere1, sphere2, sphere3]
     marbles <- V.replicateM 441 randomSphere
     pure $! initializeBVH $ V.map getBoundedHitableItem $ spheres <> marbles
 
